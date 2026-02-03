@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,6 +25,7 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://localhost:8000",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -31,11 +36,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from backend.api.routes import ingestion, analytics, evaluations, drift
+from backend.api.routes import ingestion, analytics, evaluations, drift, prompts
 app.include_router(ingestion.router)
 app.include_router(analytics.router)
 app.include_router(evaluations.router)
 app.include_router(drift.router)
+app.include_router(prompts.router)
 
 
 @app.get("/health")

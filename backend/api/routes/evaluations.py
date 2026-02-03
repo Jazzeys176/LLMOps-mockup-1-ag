@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from backend.services.evaluator import EvaluatorService
-from typing import Dict
+from typing import Dict, Any
 
 router = APIRouter(prefix="/api/v1/evaluations", tags=["evaluations"])
 evaluator_service = EvaluatorService()

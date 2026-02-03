@@ -87,7 +87,7 @@ const Dashboard = () => {
                 <KPICard title="Total Cost" value="$342.50" icon={DollarSign} trend={-5} />
                 <KPICard title="Total Tokens" value="4.5M" icon={Database} trend={8} />
                 <KPICard title="Avg Latency" value="1.2s" icon={Clock} trend={-2} />
-                <KPICard title="Satisfaction" value="94%" icon={ThumbsUp} trend={3} />
+                <KPICard title="Satisfaction" value="NA" icon={ThumbsUp} trend={NaN} />
                 <KPICard title="Task Completion" value="98.5%" icon={CheckCircle2} trend={1} />
             </div>
 
@@ -104,15 +104,15 @@ const Dashboard = () => {
                     </div>
                     <div>
                         <p className="text-gray-500">Current vs Baseline</p>
-                        <p className="font-semibold text-red-600">0.72 <span className="text-gray-400">vs</span> 0.89</p>
+                        <p className="font-semibold text-red-600">NA <span className="text-gray-400">vs</span> NA</p>
                     </div>
                     <div>
                         <p className="text-gray-500">Retrieval Overlap</p>
-                        <p className="font-semibold text-gray-800">45% (Low)</p>
+                        <p className="font-semibold text-gray-800">NA</p>
                     </div>
                     <div>
                         <p className="text-gray-500">Recommendation</p>
-                        <p className="font-semibold text-gray-800">Update embedding index for "Machine X-500"</p>
+                        <p className="font-semibold text-gray-800">NA</p>
                     </div>
                 </div>
             </div>

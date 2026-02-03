@@ -25,11 +25,11 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
         { label: 'Tracing', icon: Activity, path: '/tracing' },
         { label: 'Sessions', icon: Clock, path: '/sessions' },
         { label: 'Evaluators', icon: ClipboardCheck, path: '/evaluators' },
-        { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
-        { label: 'Prompts', icon: MessageSquare, path: '/prompts' },
-        { label: 'Datasets', icon: Database, path: '/datasets' },
-        { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
-        { label: 'Audit Logs', icon: FileText, path: '/audit' },
+        // { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
+        // { label: 'Prompts', icon: MessageSquare, path: '/prompts' },
+        // { label: 'Datasets', icon: Database, path: '/datasets' },
+        // { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
+        // { label: 'Audit Logs', icon: FileText, path: '/audit' },
     ];
 
     return (
@@ -42,9 +42,9 @@ const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) =>
             {/* Header / Logo */}
             <div className="h-16 flex items-center px-4 border-b border-white/10">
                 {isOpen ? (
-                    <span className="font-bold text-xl tracking-wide">Acme Corp</span>
+                    <span className="font-bold text-xl tracking-wide">Sigmoid</span>
                 ) : (
-                    <span className="font-bold text-xl">A</span>
+                    <span className="font-bold text-xl">S</span>
                 )}
             </div>
 

@@ -12,6 +12,7 @@ import Prompts from './pages/Prompts';
 import Datasets from './pages/Datasets';
 import Alerts from './pages/Alerts';
 import AuditLogs from './pages/AuditLogs';
+import NewPrompt from './pages/NewPrompt';
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
           <Route path="annotation_queue" element={<AnnotationQueues />} />
           <Route path="annotation_queue/:id" element={<AnnotationQueueDetail />} />
           <Route path="prompts" element={<Prompts />} />
+          <Route path="prompts/new" element={<NewPrompt />} />
           <Route path="datasets" element={<Datasets />} />
           <Route path="alerts" element={<Alerts />} />
           <Route path="audit" element={<AuditLogs />} />

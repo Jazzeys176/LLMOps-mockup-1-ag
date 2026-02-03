@@ -10,6 +10,9 @@ node_modules/
 .vscode/
 *.log
 backend/db/local.db
+backend/mlflow.db
+mlflow.db   
+mlartifacts/
 dist/
 build/
 *.egg-info/
