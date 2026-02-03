@@ -4,14 +4,14 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 222.2 84% 4.9%; /* Slate 950 */
+    --foreground: 210 40% 98%;    /* Slate 50 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 222.2 84% 4.9%;       /* Slate 950/900 check */
+    --card-foreground: 210 40% 98%;
 
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%; /* Blue 500 */
+    --primary-foreground: 222.2 47.4% 11.2%;
     
     --radius: 0.5rem;
   }

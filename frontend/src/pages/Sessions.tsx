@@ -1,83 +1,91 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, MessageSquare, Clock, ArrowRight } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 const Sessions = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Mock Data
-    const sessions = Array.from({ length: 15 }, (_, i) => ({
-        id: `sess_${1000 + i}`,
-        user: `user_${['alice', 'bob', 'charlie', 'daisy'][i % 4]}`,
-        startTime: new Date(Date.now() - i * 1000 * 60 * 60).toLocaleString(),
-        messageCount: Math.floor(Math.random() * 10) + 2,
-        topic: i % 3 === 0 ? 'Machine Maintenance' : i % 3 === 1 ? 'Safety Procedures' : 'Inventory Check',
-        cost: `$0.0${Math.floor(Math.random() * 8) + 1}`,
-        lastMessage: 'Thank you, that helps.'
-    }));
+    // Mock Data matching the screenshot style
+    const sessions = [
+        { id: 'session-0', user: 'user-20', traces: 0, totalTokens: 0, totalCost: '$0.000000', created: '28/01/2026, 13:32:35' },
+        { id: 'session-18', user: 'user-11', traces: 4, totalTokens: '6,726', totalCost: '$0.001327', created: '25/01/2026, 07:47:13' },
+        { id: 'session-48', user: 'user-7', traces: 7, totalTokens: '13,284', totalCost: '$0.030057', created: '24/01/2026, 03:30:06' },
+        { id: 'session-45', user: 'user-9', traces: 8, totalTokens: '14,106', totalCost: '$0.031576', created: '23/01/2026, 08:25:38' },
+        { id: 'session-35', user: 'user-2', traces: 7, totalTokens: '10,372', totalCost: '$0.018268', created: '23/01/2026, 01:58:23' },
+        { id: 'session-6', user: 'user-18', traces: 12, totalTokens: '20,814', totalCost: '$0.038037', created: '23/01/2026, 01:22:33' },
+        { id: 'session-13', user: 'user-20', traces: 7, totalTokens: '12,266', totalCost: '$0.049325', created: '23/01/2026, 00:59:29' },
+        { id: 'session-22', user: 'user-18', traces: 8, totalTokens: '15,470', totalCost: '$0.010775', created: '23/01/2026, 00:22:31' },
+        { id: 'session-42', user: 'user-16', traces: 8, totalTokens: '14,602', totalCost: '$0.002820', created: '22/01/2026, 23:16:54' },
+        { id: 'session-33', user: 'user-5', traces: 15, totalTokens: '28,910', totalCost: '$0.051204', created: '22/01/2026, 19:45:11' },
+    ];
 
     const filteredSessions = sessions.filter(s =>
         s.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.topic.toLowerCase().includes(searchQuery.toLowerCase())
+        s.id.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-900">User Sessions</h1>
+            {/* Header */}
+            <div className="flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-100">Sessions</h1>
+                    <p className="text-slate-500 mt-1">50 sessions</p>
+                </div>
 
+                {/* Search - Kept as requested */}
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500" size={16} />
                     <input
                         type="text"
-                        placeholder="Search user or topic..."
-                        className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64"
+                        placeholder="Search sessions..."
+                        className="pl-10 pr-4 py-2 border border-slate-800 rounded-lg text-sm bg-[#181D25] text-slate-200 focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder-slate-600 w-64"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-                {filteredSessions.map((session) => (
-                    <div
-                        key={session.id}
-                        onClick={() => navigate(`/sessions/${session.id}`)}
-                        className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group"
-                    >
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="text-lg font-bold text-gray-900">{session.topic}</h3>
-                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono">{session.id}</span>
-                                </div>
-                                <p className="text-sm text-gray-500 flex items-center gap-2">
-                                    <span>{session.user}</span>
-                                    <span>•</span>
-                                    <Clock size={14} /> {session.startTime}
-                                </p>
-                            </div>
-                            <div className="p-2 bg-gray-50 rounded-full group-hover:bg-indigo-50 transition-colors">
-                                <ArrowRight size={20} className="text-gray-400 group-hover:text-indigo-600" />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                            <div className="flex gap-6 text-sm text-gray-600">
-                                <span className="flex items-center gap-1">
-                                    <MessageSquare size={16} /> {session.messageCount} msgs
-                                </span>
-                                <span className="font-medium text-gray-900">
-                                    Cost: {session.cost}
-                                </span>
-                            </div>
-                            <p className="text-xs text-gray-400 italic max-w-md truncate">
-                                Last: "{session.lastMessage}"
-                            </p>
-                        </div>
-                    </div>
-                ))}
+            {/* Table */}
+            <div className="bg-[#181D25] rounded-xl border border-slate-800 overflow-hidden">
+                <div className="p-6 border-b border-slate-800">
+                    <h2 className="text-xl font-bold text-slate-100">All Sessions</h2>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="text-slate-400 font-medium text-xs uppercase tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th className="px-6 py-4">Session ID</th>
+                                <th className="px-6 py-4">User</th>
+                                <th className="px-6 py-4 text-center">Traces</th>
+                                <th className="px-6 py-4 text-right">Total Tokens</th>
+                                <th className="px-6 py-4 text-right">Total Cost</th>
+                                <th className="px-6 py-4">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/50">
+                            {filteredSessions.map((session) => (
+                                <tr
+                                    key={session.id}
+                                    onClick={() => navigate(`/sessions/${session.id}`)}
+                                    className="hover:bg-[#1C2028] cursor-pointer transition-colors group"
+                                >
+                                    <td className="px-6 py-4">
+                                        <span className="px-2.5 py-1 rounded bg-slate-800 text-slate-200 text-xs font-mono font-medium border border-slate-700 group-hover:bg-slate-700 transition-colors">
+                                            {session.id}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 font-medium text-slate-300">{session.user}</td>
+                                    <td className="px-6 py-4 text-center text-slate-300 font-mono">{session.traces}</td>
+                                    <td className="px-6 py-4 text-right text-slate-300 font-mono">{session.totalTokens}</td>
+                                    <td className="px-6 py-4 text-right text-slate-300 font-mono">{session.totalCost}</td>
+                                    <td className="px-6 py-4 text-slate-500 font-mono text-xs">{session.created}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );
