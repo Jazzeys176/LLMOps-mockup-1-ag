@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8001/api/v1/analytics';
+const API_BASE_URL = 'http://localhost:8000/api/v1/analytics';
 
 // Types matching Backend Pydantic Models
 export interface DashboardStats {
