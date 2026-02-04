@@ -24,6 +24,7 @@ class PromptService:
     def __init__(self):
         # In-memory storage for the demo. In prod, this is a Delta Table.
         self._prompts_db = []
+        self.enable_mlflow = os.getenv("ENABLE_MLFLOW", "False").lower() == "true"
         self.mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         
     def _get_next_version(self, prompt_name: str) -> int:
@@ -51,17 +52,18 @@ class PromptService:
         )
         
         # 1. Log to MLflow (Mocked for demo if no server)
-        try:
-            mlflow.set_tracking_uri(self.mlflow_tracking_uri)
-            mlflow.set_experiment(f"/prompts/{name}")
-            with mlflow.start_run(run_name=f"v{version}"):
-                mlflow.log_param("version", version)
-                mlflow.log_text(content, "prompt.txt")
-                if tags:
-                    for tag in tags:
-                        mlflow.set_tag("custom_tag", tag)
-        except Exception as e:
-            print(f"MLflow logging failed (optional): {e}")
+        if self.enable_mlflow:
+            try:
+                mlflow.set_tracking_uri(self.mlflow_tracking_uri)
+                mlflow.set_experiment(f"/prompts/{name}")
+                with mlflow.start_run(run_name=f"v{version}"):
+                    mlflow.log_param("version", version)
+                    mlflow.log_text(content, "prompt.txt")
+                    if tags:
+                        for tag in tags:
+                            mlflow.set_tag("custom_tag", tag)
+            except Exception as e:
+                print(f"MLflow logging failed (optional): {e}")
 
         # 2. Save to DB
         self._prompts_db.append(new_prompt)

@@ -15,6 +15,8 @@ import {
     MessageSquare,
     ShieldAlert
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { apiClient } from '../api/client'; // Import API Client
 
 const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass = "text-indigo-400 bg-indigo-500/10" }: any) => (
     <div className="bg-slate-900/50 p-6 rounded-xl shadow-lg border border-slate-800 flex items-start justify-between backdrop-blur-sm">
@@ -36,7 +38,33 @@ const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass = "text-
 );
 
 const Dashboard = () => {
-    // Mock Data
+    // State for Real Data
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Fetch Stats on Mount
+    useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const data = await apiClient.getStats();
+                setStats(data);
+            } catch (err) {
+                console.error("Failed to fetch dashboard stats", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+        // Poll every 30 seconds
+        const interval = setInterval(fetchStats, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // ... (Charts data remains mock for now as per API current implementation limit, or can be static)
+    // For this step, we focus on the KPI Cards integration.
+
+    // Mock Chart Data (To be replaced with real endpoints in future iterations if API supports it)
     const dailyActiveUsers = [
         { name: 'Mon', users: 1200 },
         { name: 'Tue', users: 1350 },
@@ -54,36 +82,23 @@ const Dashboard = () => {
         { name: 'Poor', value: 10, color: '#ef4444' },      // red-500
     ];
 
-    const tracesByName = [
-        { name: 'multi-hop-reasoning', count: 450 },
-        { name: 'tool-use-flow', count: 320 },
-        { name: 'simple-qa', count: 280 },
-    ];
+    const tracesByName = stats?.traces_by_name || [];
+    const costByModel = stats?.cost_by_model || [];
 
-    const costByModel = [
-        { name: 'gpt-4', cost: 125.50 },
-        { name: 'gpt-3.5', cost: 45.20 },
-        { name: 'claude-2', cost: 80.00 },
-        { name: 'llama-2', cost: 15.00 },
-    ];
+    // ... (rest of mock chart data)
 
-    const evaluationScores = [
-        { name: 'Hallucination', count: 496, average: 0.139 },
-        { name: 'Context Relevance', count: 496, average: 0.814 },
-        { name: 'Conciseness', count: 496, average: 0.749 },
-        { name: 'Correctness', count: 61, average: 0.467 },
-    ];
+    // ... (rest of mock chart data)
 
-    const modelUsage = [
-        { name: 'text-embedding-ada-002', tokens: '8,759', cost: '$0.000876' },
-        { name: 'gpt-4o-mini', tokens: '275,744', cost: '$0.062445' },
-        { name: 'gemini-2.5-flash', tokens: '289,080', cost: '$0.043881' },
-        { name: 'gpt-4o', tokens: '280,531', cost: '$1.890975' },
-    ];
+    // Use real tables data
+    const evaluationScores = stats?.evaluation_summary || [];
+    const modelUsage = stats?.model_usage_details || [];
 
-    // Chart Theme
     const chartAxisStyle = { stroke: '#94a3b8', fontSize: 12 };
     const chartGridStyle = { stroke: '#334155' }; // Slate 700
+
+    if (loading) {
+        return <div className="p-8 text-slate-400">Loading Dashboard...</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -93,17 +108,17 @@ const Dashboard = () => {
                 <p className="text-slate-400">LLM observability and monitoring</p>
             </div>
 
-            {/* 2. KPI Cards Row */}
+            {/* 2. KPI Cards Row - Using Real Data */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard title="Total Traces" value="496" subtext="Last 7 days" icon={Activity} colorClass="text-blue-400 bg-blue-500/10" />
-                <KPICard title="Total Cost" value="$2.0062" subtext="API costs" icon={DollarSign} colorClass="text-emerald-400 bg-emerald-500/10" />
-                <KPICard title="Total Tokens" value="854.1K" subtext="Input + Output" icon={Database} colorClass="text-purple-400 bg-purple-500/10" />
-                <KPICard title="Avg Latency" value="3025ms" subtext="Per trace" icon={Clock} trend={3} colorClass="text-amber-400 bg-amber-500/10" />
+                <KPICard title="Total Traces" value={stats?.total_traces || 0} subtext="All time" icon={Activity} colorClass="text-blue-400 bg-blue-500/10" />
+                <KPICard title="Total Cost" value={`$${stats?.total_cost || 0}`} subtext="API costs" icon={DollarSign} colorClass="text-emerald-400 bg-emerald-500/10" />
+                <KPICard title="Total Tokens" value={(stats?.total_tokens || 0).toLocaleString()} subtext="Input + Output" icon={Database} colorClass="text-purple-400 bg-purple-500/10" />
+                <KPICard title="Avg Latency" value={`${stats?.avg_latency || 0}ms`} subtext="Per trace" icon={Clock} trend={3} colorClass="text-amber-400 bg-amber-500/10" />
 
-                <KPICard title="User Satisfaction" value="4.2 / 5.0" subtext="0.3 from last week" icon={ThumbsUp} trend={3} colorClass="text-teal-400 bg-teal-500/10" />
-                <KPICard title="Task Completion" value="87%" subtext="Users completing task" icon={CheckCircle2} trend={4} colorClass="text-indigo-400 bg-indigo-500/10" />
-                <KPICard title="First Response Accuracy" value="91%" subtext="Correct on first attempt" icon={MessageSquare} trend={2} colorClass="text-cyan-400 bg-cyan-500/10" />
-                <KPICard title="Escalation Rate" value="8%" subtext="Needed human assistance" icon={ShieldAlert} trend={-2} colorClass="text-rose-400 bg-rose-500/10" />
+                <KPICard title="User Satisfaction" value="NA" subtext="Stable" icon={ThumbsUp} trend={3} colorClass="text-teal-400 bg-teal-500/10" />
+                <KPICard title="Task Completion" value="NA" subtext="Users completing task" icon={CheckCircle2} trend={NaN} colorClass="text-indigo-400 bg-indigo-500/10" />
+                <KPICard title="First Response Accuracy" value={`${stats?.first_response_accuracy || 0}%`} subtext="Correct on first attempt" icon={MessageSquare} trend={2} colorClass="text-cyan-400 bg-cyan-500/10" />
+                <KPICard title="Escalation Rate" value={`${stats?.escalation_rate || 0}%`} subtext="Needed human assistance" icon={ShieldAlert} trend={-2} colorClass="text-rose-400 bg-rose-500/10" />
             </div>
 
             {/* 3. Drift Alert Panel */}
@@ -254,7 +269,7 @@ const Dashboard = () => {
                             <ThumbsUp size={24} />
                         </div>
                         <div>
-                            <h4 className="text-2xl font-bold text-slate-100">1247</h4>
+                            <h4 className="text-2xl font-bold text-slate-100">NA</h4>
                             <p className="text-sm text-slate-500">Positive Feedback</p>
                         </div>
                     </div>
@@ -267,7 +282,7 @@ const Dashboard = () => {
                             </div>
                         </div>
                         <div>
-                            <h4 className="text-2xl font-bold text-slate-100">156</h4>
+                            <h4 className="text-2xl font-bold text-slate-100">NA</h4>
                             <p className="text-sm text-slate-500">Negative Feedback</p>
                         </div>
                     </div>
@@ -300,7 +315,7 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                            {evaluationScores.map((item) => (
+                            {evaluationScores.map((item: any) => (
                                 <tr key={item.name} className="hover:bg-slate-800/30 transition-colors">
                                     <td className="px-6 py-4 font-medium text-slate-200">{item.name}</td>
                                     <td className="px-6 py-4">{item.count}</td>
@@ -325,11 +340,11 @@ const Dashboard = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                            {modelUsage.map((item) => (
+                            {modelUsage.map((item: any) => (
                                 <tr key={item.name} className="hover:bg-slate-800/30 transition-colors">
                                     <td className="px-6 py-4 font-medium text-slate-200">{item.name}</td>
-                                    <td className="px-6 py-4 font-mono">{item.tokens}</td>
-                                    <td className="px-6 py-4 font-mono text-slate-200">{item.cost}</td>
+                                    <td className="px-6 py-4 font-mono">{Number(item.tokens).toLocaleString()}</td>
+                                    <td className="px-6 py-4 font-mono text-slate-200">${item.cost}</td>
                                 </tr>
                             ))}
                         </tbody>

@@ -8,13 +8,26 @@ class LLMJudge(BaseEvaluator):
     def __init__(self, metric_name: str, model_name: str = "gpt-4o-mini"):
         self.metric_name = metric_name
         self.model_name = model_name
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-12-01-preview"),
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
+        
+        try:
+            self.client = AzureOpenAI(
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2023-12-01-preview"),
+                azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
+            )
+        except Exception:
+            print(f"Warning: Azure OpenAI credentials missing for {metric_name}. Using Mock Evaluator.")
+            self.client = None
     
     async def evaluate(self, trace_data: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.client:
+             # Mock Response for Demo
+            import random
+            return {
+                "score": round(random.uniform(0.7, 1.0), 2),
+                "explanation": "Mock evaluation (Azure credentials missing)."
+            }
+
         prompt = self._construct_prompt(trace_data)
         
         try:

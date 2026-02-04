@@ -1,4 +1,4 @@
-import { useState } from 'react';
+
 import { NavLink } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -11,12 +11,11 @@ import {
     AlertTriangle,
     FileText,
     ChevronLeft,
-    ChevronRight,
     Menu
 } from 'lucide-react';
 import clsx from 'clsx';
 
-const Sidebar = ({ isOpen, toggle }: { isOpen: boolean; toggle: () => void }) => {
+const Sidebar = ({ isOpen }: { isOpen: boolean; toggle: () => void }) => {
     // Strict requirement: Sidebar width 240px (wider for branding) when open
     const SIDEBAR_WIDTH = isOpen ? 'w-[240px]' : 'w-20';
 

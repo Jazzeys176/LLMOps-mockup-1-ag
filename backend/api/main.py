@@ -26,6 +26,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://localhost:5173",
+    "http://localhost:5174",
 ]
 
 app.add_middleware(
@@ -37,7 +38,7 @@ app.add_middleware(
 )
 
 from backend.api.routes import ingestion, analytics, evaluations, drift, prompts
-app.include_router(ingestion.router)
+# app.include_router(ingestion.router)
 app.include_router(analytics.router)
 app.include_router(evaluations.router)
 app.include_router(drift.router)

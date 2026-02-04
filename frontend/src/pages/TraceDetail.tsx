@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, Clock, Database, DollarSign, Activity, CheckCircle2,
     FileText, List, MessageSquare
 } from 'lucide-react';
 import clsx from 'clsx';
+import { apiClient, type Trace } from '../api/client';
 
 const MetricCard = ({ title, value, icon: Icon, color = "text-slate-400" }: any) => (
     <div className="bg-[#181D25] p-4 rounded-xl shadow-sm border border-slate-800 flex items-center space-x-4">
@@ -46,33 +47,36 @@ const TraceDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'input' | 'output' | 'metadata'>('input');
+    const [trace, setTrace] = useState<Trace | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-    // Mock Data
-    const trace = {
-        id: id || 'trace_xyz789',
-        name: 'Safety Protocol Query',
-        timestamp: '2026-02-01T10:30:45Z',
-        latency: '1.24s',
-        tokens: 552,
-        cost: '$0.008',
-        status: 'success',
-        scores: {
-            hallucination: 0.95,
-            relevance: 0.88,
-            conciseness: 0.92
-        },
-        input: "What is the safety procedure for Machine X-500? specifically regarding LOTO.",
-        output: "For Machine X-500, follow these safety steps:\n1. Verify LOTO (Lock-Out Tag-Out) is engaged.\n2. Wear required PPE: safety glasses, gloves, steel-toe boots.\n3. Check emergency stop accessibility.\n4. Perform visual inspection for damage.",
-        metadata: {
-            model: "gpt-4-turbo",
-            user_id: "user_12345",
-            temperature: 0.3,
-            top_k: 5,
-            retrieved_docs: [
-                "doc_x500_safety_v2.pdf",
-                "doc_loto_procedures.pdf"
-            ]
-        }
+    useEffect(() => {
+        const fetchTrace = async () => {
+            if (!id) return;
+            try {
+                const data = await apiClient.getTraceDetail(id);
+                setTrace(data);
+            } catch (err) {
+                console.error("Failed to fetch trace detail", err);
+                setError("Failed to load trace details");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchTrace();
+    }, [id]);
+
+    if (loading) return <div className="p-8 text-center text-slate-400">Loading Trace Details...</div>;
+    if (error || !trace) return <div className="p-8 text-center text-rose-400">{error || "Trace not found"}</div>;
+
+    // Construct mock metadata display since API doesn't return full metadata yet
+    const metadataDisplay = {
+        user_id: trace.user_id,
+        session_id: trace.session_id,
+        status: trace.status,
+        timestamp: trace.timestamp
     };
 
     return (
@@ -91,7 +95,7 @@ const TraceDetail = () => {
                 </div>
                 <div className="ml-auto">
                     <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-sm font-medium rounded-full flex items-center">
-                        <CheckCircle2 size={14} className="mr-1" /> Success
+                        <CheckCircle2 size={14} className="mr-1" /> {trace.status}
                     </span>
                 </div>
             </div>
@@ -105,11 +109,13 @@ const TraceDetail = () => {
             </div>
 
             {/* Evaluation Scores */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <ScoreCard title="Hallucination Score" score={trace.scores.hallucination} />
-                <ScoreCard title="Context Relevance" score={trace.scores.relevance} />
-                <ScoreCard title="Conciseness" score={trace.scores.conciseness} />
-            </div>
+            {trace.scores && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <ScoreCard title="Hallucination Score" score={trace.scores.hallucination} />
+                    <ScoreCard title="Context Relevance" score={trace.scores.context_relevance} />
+                    <ScoreCard title="Conciseness" score={trace.scores.conciseness} />
+                </div>
+            )}
 
             {/* Tabbed Content */}
             <div className="bg-[#181D25] rounded-xl shadow-sm border border-slate-800 overflow-hidden">
@@ -156,7 +162,7 @@ const TraceDetail = () => {
                     )}
                     {activeTab === 'metadata' && (
                         <div className="bg-[#13161c] p-4 rounded-lg border border-slate-800 font-mono text-sm text-slate-300">
-                            <pre>{JSON.stringify(trace.metadata, null, 2)}</pre>
+                            <pre>{JSON.stringify(metadataDisplay, null, 2)}</pre>
                         </div>
                     )}
                 </div>

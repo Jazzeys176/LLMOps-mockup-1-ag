@@ -11,6 +11,7 @@ node_modules/
 *.log
 backend/db/local.db
 backend/mlflow.db
+backend/analytics.db
 mlflow.db   
 mlartifacts/
 dist/

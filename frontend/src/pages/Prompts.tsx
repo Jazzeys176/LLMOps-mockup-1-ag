@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Edit3, Settings, Save, Clock, Copy, Terminal,
-    ChevronRight, ArrowUpCircle, CheckCircle
+    Plus, Edit3, Settings, Save, Clock, Terminal,
+    ChevronRight, ArrowUpCircle
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -281,7 +281,7 @@ const Prompts = () => {
 
                             {activeTab === 'history' && (
                                 <div className="space-y-4 max-w-3xl mx-auto">
-                                    {history.map((ver, idx) => (
+                                    {history.map((ver) => (
                                         <div key={ver.version} className="bg-white border border-gray-200 rounded-lg p-4 flex gap-4">
                                             <div className={clsx("w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm", ver.environment === 'prod' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")}>
                                                 {ver.version}
