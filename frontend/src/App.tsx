@@ -13,6 +13,7 @@ import Datasets from './pages/Datasets';
 import Alerts from './pages/Alerts';
 import AuditLogs from './pages/AuditLogs';
 import NewPrompt from './pages/NewPrompt';
+import NewEvaluatorTemplate from './pages/NewEvaluatorTemplate';
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
           <Route path="sessions" element={<Sessions />} />
           <Route path="sessions/:id" element={<SessionDetail />} />
           <Route path="evaluators" element={<Evaluators />} />
+          <Route path="evaluators/templates/new" element={<NewEvaluatorTemplate />} />
           <Route path="annotation_queue" element={<AnnotationQueues />} />
           <Route path="annotation_queue/:id" element={<AnnotationQueueDetail />} />
           <Route path="prompts" element={<Prompts />} />

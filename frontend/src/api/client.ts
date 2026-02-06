@@ -48,6 +48,15 @@ export interface TraceBubble {
     trace_id: string;
 }
 
+export interface EvaluationLog {
+    timestamp: string;
+    evaluator_name: string;
+    trace_id: string;
+    score_value: number;
+    duration_ms: number;
+    status: string;
+}
+
 // Client Implementation
 export const apiClient = {
     async getStats(): Promise<DashboardStats> {
@@ -90,5 +99,12 @@ export const apiClient = {
         const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/traces`);
         if (!response.ok) throw new Error('Failed to fetch session traces');
         return response.json();
+    },
+
+    async getEvaluationLogs(limit: number = 50): Promise<EvaluationLog[]> {
+        const response = await fetch(`${API_BASE_URL.replace('/analytics', '/evaluations')}/logs?limit=${limit}`);
+        if (!response.ok) throw new Error('Failed to fetch evaluation logs');
+        return response.json();
     }
 };
+

@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ExternalLink, Plus } from 'lucide-react';
 import clsx from 'clsx';
+import { apiClient, type EvaluationLog } from '../api/client';
 
 const Evaluators = () => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'evaluators' | 'templates' | 'logs'>('evaluators');
 
     // --- Mock Data ---
@@ -51,14 +54,27 @@ const Evaluators = () => {
         }
     ];
 
-    const evalLogs = [
-        { id: 'l1', timestamp: '15/01/2024, 16:00:00', evaluator: 'Hallucination Detector', traceId: 'trace-001', score: '0.92', duration: '1250ms', status: 'Success' },
-        { id: 'l2', timestamp: '15/01/2024, 15:58:00', evaluator: 'Context Relevance', traceId: 'trace-002', score: '0.85', duration: '980ms', status: 'Success' },
-        { id: 'l3', timestamp: '15/01/2024, 15:55:00', evaluator: 'Answer Accuracy', traceId: 'trace-003', score: '0.78', duration: '1100ms', status: 'Success' },
-        { id: 'l4', timestamp: '15/01/2024, 15:52:00', evaluator: 'Hallucination Detector', traceId: 'trace-004', score: '0.45', duration: '1300ms', status: 'Success' },
-        { id: 'l5', timestamp: '15/01/2024, 15:50:00', evaluator: 'Toxicity Check', traceId: 'trace-005', score: '0.98', duration: '750ms', status: 'Success' },
-        { id: 'l6', timestamp: '15/01/2024, 15:48:00', evaluator: 'Context Relevance', traceId: 'trace-006', score: '-', duration: '5000ms', status: 'Timeout' },
-    ];
+    // State for Real Logs
+    const [evalLogs, setEvalLogs] = useState<EvaluationLog[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+
+    // Fetch Logs on Tab Change
+    useEffect(() => {
+        if (activeTab === 'logs') {
+            const fetchLogs = async () => {
+                setLoadingLogs(true);
+                try {
+                    const data = await apiClient.getEvaluationLogs();
+                    setEvalLogs(data);
+                } catch (err) {
+                    console.error("Failed to fetch evaluation logs", err);
+                } finally {
+                    setLoadingLogs(false);
+                }
+            };
+            fetchLogs();
+        }
+    }, [activeTab]);
 
     return (
         <div className="space-y-6">
@@ -150,7 +166,9 @@ const Evaluators = () => {
                     <div>
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-slate-100">Evaluator Templates</h2>
-                            <button className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm transition-colors border border-slate-700">
+                            <button
+                                onClick={() => navigate('/evaluators/templates/new')}
+                                className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-sm transition-colors border border-slate-700">
                                 <Plus size={16} className="mr-2" />
                                 New Template
                             </button>
@@ -209,56 +227,62 @@ const Evaluators = () => {
                                         <th className="px-6 py-4">Score</th>
                                         <th className="px-6 py-4">Duration</th>
                                         <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-800/50">
-                                    {evalLogs.map((log) => {
-                                        const scoreVal = parseFloat(log.score);
-                                        const isLowScore = !isNaN(scoreVal) && scoreVal < 0.5;
+                                    {loadingLogs ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                                Loading logs...
+                                            </td>
+                                        </tr>
+                                    ) : evalLogs.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                                No evaluation logs found.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        evalLogs.map((log, index) => {
+                                            const scoreVal = log.score_value;
+                                            const isLowScore = !isNaN(scoreVal) && scoreVal < 0.5;
 
-                                        return (
-                                            <tr key={log.id} className="hover:bg-[#1C2028] transition-colors">
-                                                <td className="px-6 py-4 text-slate-500 font-mono text-xs">{log.timestamp}</td>
-                                                <td className="px-6 py-4 font-medium text-slate-200">{log.evaluator}</td>
-                                                <td className="px-6 py-4 text-slate-400 font-mono text-xs">
-                                                    <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700">
-                                                        {log.traceId}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {log.score === '-' ? (
-                                                        <span className="text-slate-600">-</span>
-                                                    ) : (
+                                            return (
+                                                <tr key={index} className="hover:bg-[#1C2028] transition-colors">
+                                                    <td className="px-6 py-4 text-slate-500 font-mono text-xs">
+                                                        {new Date(log.timestamp).toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 font-medium text-slate-200">{log.evaluator_name}</td>
+                                                    <td className="px-6 py-4 text-slate-400 font-mono text-xs">
+                                                        <span className="px-2 py-1 bg-slate-800 rounded border border-slate-700">
+                                                            {log.trace_id.substring(0, 8)}...
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
                                                         <span className={clsx(
                                                             "px-2 py-0.5 rounded font-mono text-xs font-bold border",
                                                             isLowScore
                                                                 ? "bg-amber-950/30 text-amber-500 border-amber-900/30"
                                                                 : "bg-emerald-950/30 text-emerald-500 border-emerald-900/30"
                                                         )}>
-                                                            {log.score}
+                                                            {scoreVal.toFixed(2)}
                                                         </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-300 font-mono text-xs">{log.duration}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={clsx(
-                                                        "px-2 py-0.5 rounded-full text-xs font-medium border",
-                                                        log.status === 'Success'
-                                                            ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                                            : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                                    )}>
-                                                        {log.status}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <button className="flex items-center text-slate-400 hover:text-slate-200 transition-colors text-xs">
-                                                        <ExternalLink size={14} className="mr-1.5" /> View Trace
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-300 font-mono text-xs">{log.duration_ms}ms</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={clsx(
+                                                            "px-2 py-0.5 rounded-full text-xs font-medium border",
+                                                            log.status === 'Completed' || log.status === 'Success'
+                                                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                                                : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                                        )}>
+                                                            {log.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
+                                    )}
                                 </tbody>
                             </table>
                         </div>
