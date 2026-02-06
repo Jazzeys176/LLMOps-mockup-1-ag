@@ -113,14 +113,14 @@ const SessionDetail = () => {
                             <div className={clsx(
                                 "rounded-2xl p-4 shadow-sm text-sm whitespace-pre-wrap leading-relaxed",
                                 msg.role === 'user'
-                                    ? "bg-indigo-600/20 text-indigo-100 rounded-tr-none border border-indigo-500/20"
-                                    : "bg-slate-800/50 text-slate-200 border border-slate-700 rounded-tl-none"
+                                    ? "bg-teal-500 text-indigo-100 rounded-tr-none border border-indigo-500/20"
+                                    : "bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none"
                             )}>
                                 {msg.content}
 
                                 <div className={clsx(
                                     "mt-2 pt-2 border-t flex items-center justify-between text-xs font-mono",
-                                    msg.role === 'user' ? "border-indigo-500/20 text-indigo-300/50" : "border-slate-700 text-slate-500"
+                                    msg.role === 'user' ? "border-indigo-500/20 text-indigo-900" : "border-slate-700 text-slate-500"
                                 )}>
                                     <span>{msg.timestamp}</span>
                                 </div>

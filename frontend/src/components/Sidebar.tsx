@@ -24,11 +24,11 @@ const Sidebar = ({ isOpen }: { isOpen: boolean; toggle: () => void }) => {
         { label: 'Tracing', icon: Activity, path: '/tracing' },
         { label: 'Sessions', icon: Clock, path: '/sessions' },
         { label: 'Evaluators', icon: ClipboardCheck, path: '/evaluators' },
-        { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
-        { label: 'Prompts', icon: MessageSquare, path: '/prompts' },
-        { label: 'Datasets', icon: Database, path: '/datasets' },
-        { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
-        { label: 'Audit', icon: FileText, path: '/audit' },
+        // { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
+        // { label: 'Prompts', icon: MessageSquare, path: '/prompts' },
+        // { label: 'Datasets', icon: Database, path: '/datasets' },
+        // { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
+        // { label: 'Audit', icon: FileText, path: '/audit' },
     ];
 
     return (
@@ -91,14 +91,14 @@ const Sidebar = ({ isOpen }: { isOpen: boolean; toggle: () => void }) => {
             </div>
 
             {/* Footer / Settings */}
-            <div className="p-4 border-t border-slate-800/50">
+            {/* <div className="p-4 border-t border-slate-800/50">
                 <button className={clsx(
                     "flex items-center px-3 py-2.5 rounded-lg w-full text-left transition-colors hover:bg-slate-900 text-slate-400 hover:text-slate-200"
                 )}>
                     <Menu size={18} className="min-w-[18px]" />
                     {isOpen && <span className="ml-3 text-sm font-medium">Settings</span>}
                 </button>
-            </div>
+            </div> */}
         </div>
     );
 };
