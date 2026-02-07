@@ -1,136 +1,171 @@
 import os
 import uuid
 import mlflow
+import json
 from datetime import datetime
 from typing import List, Optional, Dict
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from backend.db.client import query_db_dict, execute_query
+
 load_dotenv()
 
-# Mocking a Delta Table writer for this demo since we don't have a live Spark cluster.
-# In production, this would use `delta-spark` or `pandas` to write to ADLS/S3.
-
 class PromptVersion(BaseModel):
-    prompt_id: str
-    prompt_name: str
-    prompt_text: str
-    variables: List[str]
+    id: str
+    name: str
     version: int
-    environment: str  # 'prod', 'staging', 'dev', 'archived'
-    is_active: bool
+    content: str
+    description: str
+    variables: List[str]
+    tags: List[str]
+    model_parameters: Dict
+    environment: str
+    author: str
     created_at: datetime
+    mlflow_run_id: Optional[str] = None
 
 class PromptService:
     def __init__(self):
-        # In-memory storage for the demo. In prod, this is a Delta Table.
-        self._prompts_db = []
         self.enable_mlflow = os.getenv("ENABLE_MLFLOW", "False").lower() == "true"
         self.mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
         
     def _get_next_version(self, prompt_name: str) -> int:
-        versions = [p.version for p in self._prompts_db if p.prompt_name == prompt_name]
-        return max(versions) + 1 if versions else 1
+        res = query_db_dict("SELECT MAX(version) as max_ver FROM prompt_versions WHERE name = ?", (prompt_name,))
+        if res and res[0]['max_ver'] is not None:
+            return res[0]['max_ver'] + 1
+        return 1
 
-    def create_prompt_version(self, name: str, content: str, variables: List[str], tags: List[str] = None) -> PromptVersion:
+    def _get_canonical_name(self, name: str) -> str:
+        """
+        Checks if a prompt with the given name exists (case-insensitive) in DuckDB.
+        Returns the existing name if found, otherwise returns the input name.
+        """
+        # DuckDB's ILIKE is case-insensitive
+        query = "SELECT DISTINCT name FROM prompt_versions WHERE name ILIKE ?"
+        res = query_db_dict(query, (name,))
+        if res:
+            return res[0]['name']
+        return name
+
+    def create_prompt_version(self, name: str, content: str, variables: List[str], 
+                              tags: List[str] = None, description: str = "",
+                              model_parameters: Dict = None) -> Dict:
         """
         Creates a new version of a prompt.
-        1. Logs artifact to MLflow.
-        2. Saves metadata row to 'Database' (Delta).
         """
+        # Resolve canonical name (case-insensitive) to prevent duplicates
+        name = self._get_canonical_name(name)
+        
         version = self._get_next_version(name)
         prompt_id = str(uuid.uuid4())
+        run_id = None
         
-        new_prompt = PromptVersion(
-            prompt_id=prompt_id,
-            prompt_name=name,
-            prompt_text=content,
-            variables=variables,
-            version=version,
-            environment="dev", # Default new versions to dev
-            is_active=True,
-            created_at=datetime.utcnow()
-        )
+        # Defaults
+        if tags is None: tags = []
+        if model_parameters is None: model_parameters = {}
         
-        # 1. Log to MLflow (Mocked for demo if no server)
+        # 1. Log to MLflow
         if self.enable_mlflow:
             try:
                 mlflow.set_tracking_uri(self.mlflow_tracking_uri)
                 mlflow.set_experiment(f"/prompts/{name}")
-                with mlflow.start_run(run_name=f"v{version}"):
+                with mlflow.start_run(run_name=f"v{version}") as run:
+                    run_id = run.info.run_id
                     mlflow.log_param("version", version)
                     mlflow.log_text(content, "prompt.txt")
-                    if tags:
-                        for tag in tags:
-                            mlflow.set_tag("custom_tag", tag)
+                    mlflow.log_params(model_parameters)
+                    for tag in tags:
+                        mlflow.set_tag("custom_tag", tag)
             except Exception as e:
-                print(f"MLflow logging failed (optional): {e}")
+                print(f"MLflow logging failed: {e}")
 
         # 2. Save to DB
-        self._prompts_db.append(new_prompt)
-        return new_prompt
+        query = """
+        INSERT INTO prompt_versions (
+            id, name, version, content, description, variables, tags, 
+            model_parameters, environment, author, created_at, mlflow_run_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        execute_query(query, (
+            prompt_id, name, version, content, description, 
+            json.dumps(variables), json.dumps(tags), json.dumps(model_parameters),
+            "dev", "admin", datetime.utcnow(), run_id
+        ))
+        
+        return {
+            "id": prompt_id,
+            "version": version,
+            "status": "success"
+        }
 
     def list_prompts(self) -> List[Dict]:
         """Returns the latest version of each distinct prompt."""
-        # Group by name, find max version
-        latest = {}
-        for p in self._prompts_db:
-            if p.prompt_name not in latest or p.version > latest[p.prompt_name].version:
-                latest[p.prompt_name] = p
-        
-        return [
-            {
-                "id": p.prompt_id,
-                "name": p.prompt_name,
-                "description": f"Latest: v{p.version} ({p.environment})", 
-                "tags": [p.environment] 
-            }
-            for p in latest.values()
-        ]
+        # Get latest version for each name
+        query = """
+        WITH RankedPrompts AS (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY name ORDER BY version DESC) as rn
+            FROM prompt_versions
+        )
+        SELECT * FROM RankedPrompts WHERE rn = 1
+        """
+        rows = query_db_dict(query)
+        results = []
+        for r in rows:
+            # Parse JSON fields if needed, though list endpoint might just need basics
+            try:
+                tags = json.loads(r['tags']) if r['tags'] else []
+            except: tags = []
+            
+            results.append({
+                "id": r['id'],
+                "name": r['name'],
+                "description": r['description'],
+                "tags": [r['environment']] + tags, # Show env as a tag in UI
+                "latest_version": r['version']
+            })
+        return results
 
     def get_history(self, prompt_name: str) -> List[Dict]:
         """Returns full history for a prompt."""
-        history = [p for p in self._prompts_db if p.prompt_name == prompt_name]
-        return sorted([
-            {
-                "version": f"v{p.version}",
-                "date": p.created_at.strftime("%Y-%m-%d %H:%M"),
-                "author": "admin", # Mock author
-                "comment": f"Update to v{p.version}",
-                "environment": p.environment 
-            }
-            for p in history
-        ], key=lambda x: x['version'], reverse=True)
+        query = "SELECT * FROM prompt_versions WHERE name = ? ORDER BY version DESC"
+        rows = query_db_dict(query, (prompt_name,))
+        history = []
+        for r in rows:
+             # Handle JSON parsing safely
+            try:
+                model_parameters = json.loads(r['model_parameters']) if r['model_parameters'] else {}
+                variables = json.loads(r['variables']) if r['variables'] else []
+            except:
+                model_parameters = {}
+                variables = []
+
+            history.append({
+                "version": r['version'],
+                "date": r['created_at'].strftime("%Y-%m-%d %H:%M") if hasattr(r['created_at'], 'strftime') else str(r['created_at']),
+                "author": r['author'],
+                "comment": f"Update v{r['version']}",
+                "environment": r['environment'],
+                "content": r['content'],
+                "model_parameters": model_parameters,
+                "variables": variables
+            })
+        return history
 
     def promote_version(self, prompt_name: str, version: int, target_env: str):
         """
-        Promotes a specific version to an environment (e.g., 'prod').
-        Demotes any existing version in that environment.
+        Promotes a version. 
         """
-        # 1. Demote existing
-        for p in self._prompts_db:
-            if p.prompt_name == prompt_name and p.environment == target_env:
-                p.environment = "archived"
+        # 1. Demote existing in target_env
+        execute_query(
+            "UPDATE prompt_versions SET environment = 'archived' WHERE name = ? AND environment = ?",
+            (prompt_name, target_env)
+        )
         
-        # 2. Promote target
-        target = next((p for p in self._prompts_db if p.prompt_name == prompt_name and p.version == version), None)
-        if target:
-            target.environment = target_env
-            return True
-        return False
+        # 2. Promote new version
+        execute_query(
+            "UPDATE prompt_versions SET environment = ? WHERE name = ? AND version = ?",
+            (target_env, prompt_name, version)
+        )
+        return True
 
-# Singleton instance
 prompt_service = PromptService()
-
-# Seed some initial data
-prompt_service.create_prompt_version(
-    "Factory Assistant", 
-    "You are a helpful factory assistant.\nContext: {context}", 
-    ["context"], 
-    ["safety"]
-)
-prompt_service.create_prompt_version(
-    "Safety Classifier", 
-    "Classify the following incident: {incident}", 
-    ["incident"], 
-    ["classification"]
-)

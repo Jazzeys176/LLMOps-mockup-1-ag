@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Save, Terminal, ArrowLeft } from 'lucide-react';
+import { Save, Terminal, ArrowLeft, Settings } from 'lucide-react';
 
 const NewPrompt = () => {
     const navigate = useNavigate();
@@ -31,6 +31,16 @@ const NewPrompt = () => {
         setVariables([...new Set(found)]);
     }, [content]);
 
+    // Model Config State
+    const [modelConfig, setModelConfig] = useState({
+        model: "gpt-4o",
+        temperature: 0.7,
+        maxTokens: 500,
+        topP: 0.95,
+        freqPenalty: 0,
+        presPenalty: 0
+    });
+
     const handleSave = async () => {
         if (!name.trim() || !content.trim()) {
             alert("Name and Content are required");
@@ -47,7 +57,8 @@ const NewPrompt = () => {
                     description,
                     content,
                     variables,
-                    tags: tags.split(',').map(t => t.trim()).filter(Boolean)
+                    tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+                    model_parameters: modelConfig
                 })
             });
 
@@ -158,8 +169,74 @@ const NewPrompt = () => {
                     </div>
                 </div>
 
-                {/* Sidebar Info */}
-                <div className="w-80 bg-[#111827] p-6 overflow-y-auto hidden xl:block">
+                {/* Sidebar Info & Config */}
+                <div className="w-80 bg-[#111827] p-6 overflow-y-auto hidden xl:block border-l border-slate-800">
+
+                    {/* Model Config Section */}
+                    <div className="mb-8">
+                        <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+                            <Settings size={16} className="text-teal-500" />
+                            Model Configuration
+                        </h3>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-400 block mb-1">Model</label>
+                                <select
+                                    value={modelConfig.model}
+                                    onChange={(e) => setModelConfig({ ...modelConfig, model: e.target.value })}
+                                    className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-xs rounded p-2 focus:border-teal-500 outline-none"
+                                >
+                                    <option value="gpt-4o">gpt-4o</option>
+                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-400 block mb-1">Temp</label>
+                                    <input
+                                        type="number" step="0.1"
+                                        value={modelConfig.temperature}
+                                        onChange={(e) => setModelConfig({ ...modelConfig, temperature: parseFloat(e.target.value) })}
+                                        className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-xs rounded p-2 focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-400 block mb-1">Max Tokens</label>
+                                    <input
+                                        type="number"
+                                        value={modelConfig.maxTokens}
+                                        onChange={(e) => setModelConfig({ ...modelConfig, maxTokens: parseInt(e.target.value) })}
+                                        className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-xs rounded p-2 focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-400 block mb-1">Top P</label>
+                                    <input
+                                        type="number" step="0.05"
+                                        value={modelConfig.topP}
+                                        onChange={(e) => setModelConfig({ ...modelConfig, topP: parseFloat(e.target.value) })}
+                                        className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-xs rounded p-2 focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-400 block mb-1">Freq Penalty</label>
+                                    <input
+                                        type="number" step="0.1"
+                                        value={modelConfig.freqPenalty}
+                                        onChange={(e) => setModelConfig({ ...modelConfig, freqPenalty: parseFloat(e.target.value) })}
+                                        className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-xs rounded p-2 focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="sticky top-0">
                         <h3 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
                             <Terminal size={16} className="text-teal-500" />
@@ -195,5 +272,6 @@ const NewPrompt = () => {
         </div>
     );
 };
+
 
 export default NewPrompt;
