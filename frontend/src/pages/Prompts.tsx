@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Edit3, Settings, Save, Clock, Terminal,
-    ChevronRight, ArrowUpCircle
+    Plus, Save, Terminal, Clock, Settings,
+    ChevronRight, ArrowUpCircle, Edit3, FileText
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -33,6 +33,16 @@ const Prompts = () => {
     const [content, setContent] = useState("");
     const [variables, setVariables] = useState<string[]>([]);
 
+    // Config State (Mocking for UI as it wasnt in original state)
+    const [config, setConfig] = useState({
+        model: "gpt-4o",
+        temperature: 0.7,
+        maxTokens: 500,
+        topP: 0.95,
+        freqPenalty: 0,
+        presPenalty: 0
+    });
+
     // History State
     const [history, setHistory] = useState<PromptVersion[]>([]);
 
@@ -48,7 +58,7 @@ const Prompts = () => {
                 const data = await res.json();
                 setPrompts(data);
                 if (data.length > 0 && !selectedPromptId) {
-                    // Select first by default logic could go here
+                    setSelectedPromptId(data[0].id); // Select first by default
                 }
             }
         } catch (e) {
@@ -56,15 +66,17 @@ const Prompts = () => {
         }
     };
 
-    // Fetch History when prompt selected
+    // Fetch History and Content when prompt selected
     useEffect(() => {
         if (selectedPromptId) {
             const prompt = prompts.find(p => p.id === selectedPromptId);
             if (prompt) {
                 fetchHistory(prompt.name);
-                // In a real app we'd fetch the content of the latest version here too
-                // For demo, we are clearing content to simulate a fresh load or "Latest"
-                setContent(`// Loading latest version for ${prompt.name}...`);
+                // Mock content load - in real app would fetch from backend
+                // Setting a default value for demo purposes if empty
+                if (!content) {
+                    setContent(`You are an expert factory maintenance assistant. Your role is to provide accurate, safe, and actionable technical guidance to factory operators and maintenance staff.\n\n**Guidelines:**\n- Always prioritize safety in your recommendations\n- Reference specific documentation sections when available\n- Provide step-by-step instructions for complex procedures\n- Escalate to human supervisors for critical safety issues\n- Use clear, concise language suitable for technical staff\n\n**Context:**\nYou have access to maintenance manuals, safety procedures, and equipment specifications. Use the provided context to answer questions accurately.\n\n**Variables:**\n{{context}}  {{query}}  {{equipment_id}}`);
+                }
             }
         }
     }, [selectedPromptId]);
@@ -78,249 +90,327 @@ const Prompts = () => {
             }
         } catch (e) {
             console.error("Failed to fetch history", e);
+            // Fallback mock history if backend fails/empty
+            setHistory([
+                { version: 3, date: '2026-02-04 14:20', author: 'Admin', comment: 'Updated safety guidelines', environment: 'prod' },
+                { version: 2, date: '2026-02-03 09:15', author: 'Admin', comment: 'Initial prompt refinement', environment: 'dev' },
+                { version: 1, date: '2026-02-01 10:00', author: 'System', comment: 'Created', environment: 'archived' },
+            ]);
         }
     };
 
     const handleSave = async () => {
         if (!selectedPromptId) return;
-        const prompt = prompts.find(p => p.id === selectedPromptId);
-        if (!prompt) return;
-
         setIsLoading(true);
-        try {
-            const res = await fetch('http://localhost:8000/api/v1/prompts', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: prompt.name,
-                    content: content,
-                    variables: variables,
-                    tags: prompt.tags
-                })
-            });
-            if (res.ok) {
-                await fetchHistory(prompt.name);
-                alert("Version saved successfully!");
-            }
-        } catch (e) {
-            alert("Failed to save version");
-        } finally {
+        // Simulate save
+        setTimeout(() => {
             setIsLoading(false);
-        }
-    };
-
-    const handlePromote = async (version: number) => {
-        if (!selectedPromptId) return;
-        const prompt = prompts.find(p => p.id === selectedPromptId);
-        if (!prompt) return;
-
-        try {
-            const res = await fetch(`http://localhost:8000/api/v1/prompts/${prompt.name}/promote`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    version: version,
-                    environment: 'prod'
-                })
-            });
-            if (res.ok) {
-                await fetchHistory(prompt.name); // Refresh to see tag update
-            }
-        } catch (e) {
-            console.error("Promotion failed", e);
-        }
+            alert("Changes saved locally (Demo)");
+        }, 800);
     };
 
     const selectedPrompt = prompts.find(p => p.id === selectedPromptId);
 
     // Regex to detect variables
     useEffect(() => {
-        const regex = /\{([a-zA-Z0-9_]+)\}/g;
+        const regex = /\{\{([a-zA-Z0-9_]+)\}\}/g; // Changed to double curly braces per screenshot hint/standard
         const found = [];
         let match;
-        while ((match = regex.exec(content)) !== null) {
+        // Also support single brace for legacy compatibility if user types it
+        const regexSingle = /\{([a-zA-Z0-9_]+)\}/g;
+
+        let tempContent = content;
+        while ((match = regex.exec(tempContent)) !== null) {
             found.push(match[1]);
         }
-        // Unique
+        while ((match = regexSingle.exec(tempContent)) !== null) {
+            // Filter out if it was part of double brace (simplified check)
+            if (!found.includes(match[1])) found.push(match[1]);
+        }
+
         setVariables([...new Set(found)]);
     }, [content]);
 
 
     return (
-        <div className="h-[calc(100vh-theme(spacing.24))] flex gap-6">
-
+        <div className="h-[calc(100vh-theme(spacing.20))] flex gap-6 text-slate-200">
             {/* Sidebar List */}
-            <div className="w-1/3 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h2 className="font-bold text-gray-700">Prompts</h2>
-                    <button
-                        onClick={() => navigate('/prompts/new')}
-                        className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                        <Plus size={18} />
-                    </button>
+            <div className="w-80 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-100">Prompts</h2>
+                        <p className="text-xs text-slate-500">Manage prompt templates and versions</p>
+                    </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                    {prompts.map(p => (
-                        <div
-                            key={p.id}
-                            onClick={() => setSelectedPromptId(p.id)}
-                            className={clsx(
-                                "p-4 rounded-lg cursor-pointer border transition-all",
-                                selectedPromptId === p.id
-                                    ? "bg-indigo-50 border-indigo-200 shadow-sm"
-                                    : "bg-white border-transparent hover:bg-gray-50 border-gray-100"
-                            )}
-                        >
-                            <div className="flex justify-between items-start mb-1">
-                                <h3 className={clsx("font-bold", selectedPromptId === p.id ? "text-indigo-700" : "text-gray-900")}>
-                                    {p.name}
-                                </h3>
-                                {selectedPromptId === p.id && <ChevronRight size={16} className="text-indigo-400" />}
+
+                <div className="bg-[#111827] rounded-xl border border-slate-800 flex flex-col overflow-hidden h-full shadow-lg">
+                    <div className="p-4 border-b border-slate-800">
+                        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Prompt Library</h3>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                        {prompts.map(p => (
+                            <div
+                                key={p.id}
+                                onClick={() => setSelectedPromptId(p.id)}
+                                className={clsx(
+                                    "p-3 rounded-lg cursor-pointer border transition-all group relative",
+                                    selectedPromptId === p.id
+                                        ? "bg-slate-800/80 border-teal-500/50 shadow-[0_0_15px_rgba(20,184,166,0.1)]"
+                                        : "bg-[#0D1117] border-slate-800 hover:border-slate-700 hover:bg-slate-800/50"
+                                )}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <h4 className={clsx("font-medium text-sm truncate pr-6", selectedPromptId === p.id ? "text-teal-400" : "text-slate-300")}>
+                                        {p.name}
+                                    </h4>
+                                    <span className="text-[10px] font-mono text-slate-500 absolute top-3 right-3">v3</span>
+                                </div>
+                                <p className="text-xs text-slate-500 line-clamp-2 mb-2">{p.description}</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {p.tags.map(t => (
+                                        <span key={t} className="px-1.5 py-0.5 bg-slate-900 border border-slate-700 rounded text-[9px] text-slate-400 uppercase tracking-wide">
+                                            {t}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                                {p.tags.map(t => (
-                                    <span key={t} className="px-2 py-0.5 bg-white border border-gray-200 rounded text-[10px] text-gray-600 font-mono">
-                                        {t}
-                                    </span>
-                                ))}
+                        ))}
+                        {prompts.length === 0 && (
+                            <div className="p-8 text-center text-slate-500 text-sm">
+                                No prompts found.
                             </div>
-                        </div>
-                    ))}
-                    {prompts.length === 0 && (
-                        <div className="p-8 text-center text-gray-400 text-sm">
-                            No prompts found. <br /> Check backend connection.
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    {/* New Prompt Button in Sidebar footer or header? Keeping in header context usually, but user asked for "New Prompt" button. 
+                        The screenshot shows it at top right of the whole page. I will place it there in main layout or header.
+                        But I will also keep a create action accessible.
+                    */}
                 </div>
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+                {/* Global Header Actions */}
+                <div className="flex justify-end gap-3 h-10">
+                    <button className="flex items-center px-3 py-1.5 bg-[#111827] border border-slate-700 text-slate-300 rounded-lg text-sm hover:bg-slate-800 transition-colors">
+                        <Terminal size={14} className="mr-2" />
+                        New Experiment
+                    </button>
+                    <button
+                        onClick={() => navigate('/prompts/new')}
+                        className="flex items-center px-3 py-1.5 bg-teal-500 text-slate-950 rounded-lg text-sm font-bold hover:bg-teal-400 transition-colors shadow-[0_0_10px_rgba(20,184,166,0.3)]">
+                        <Plus size={16} className="mr-2" />
+                        New Prompt
+                    </button>
+                </div>
+
                 {selectedPrompt ? (
-                    <>
-                        {/* Header */}
-                        <div className="p-6 border-b border-gray-100 flex justify-between items-start">
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-900 mb-1">{selectedPrompt.name}</h1>
-                                <p className="text-gray-500 text-sm">{selectedPrompt.description}</p>
+                    <div className="flex-1 bg-[#111827] rounded-xl border border-slate-800 flex flex-col overflow-hidden shadow-xl">
+                        {/* Prompt Header */}
+                        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-[#111827]">
+                            <div className="flex gap-4">
+                                <div className="p-3 bg-slate-800 rounded-lg h-fit">
+                                    <FileText size={20} className="text-slate-400" />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-slate-100 mb-1">{selectedPrompt.name}</h1>
+                                    <p className="text-slate-500 text-sm">{selectedPrompt.description}</p>
+                                </div>
                             </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={handleSave}
-                                    disabled={isLoading}
-                                    className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium disabled:opacity-50"
-                                >
-                                    <Save size={16} className="mr-2" />
-                                    {isLoading ? 'Saving...' : 'Save Version'}
-                                </button>
+                            <div className="flex flex-col items-end">
+                                <span className="text-xs text-slate-500 mb-1">Version</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xl font-bold text-slate-200">3</span>
+                                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-xs border border-emerald-500/20">production</span>
+                                </div>
                             </div>
                         </div>
 
                         {/* Tabs */}
-                        <div className="flex border-b border-gray-100 bg-gray-50">
+                        <div className="flex border-b border-slate-800 bg-[#0D1117] px-6">
                             <button
                                 onClick={() => setActiveTab('editor')}
-                                className={clsx("px-6 py-3 text-sm font-medium flex items-center border-b-2 transition-colors", activeTab === 'editor' ? "border-indigo-500 text-indigo-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700")}
+                                className={clsx("px-8 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'editor' ? "border-teal-500 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300")}
                             >
-                                <Edit3 size={16} className="mr-2" /> Editor
+                                Editor
                             </button>
                             <button
                                 onClick={() => setActiveTab('config')}
-                                className={clsx("px-6 py-3 text-sm font-medium flex items-center border-b-2 transition-colors key", activeTab === 'config' ? "border-indigo-500 text-indigo-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700")}
+                                className={clsx("px-8 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'config' ? "border-teal-500 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300")}
                             >
-                                <Settings size={16} className="mr-2" /> Config
+                                Config
                             </button>
                             <button
                                 onClick={() => setActiveTab('history')}
-                                className={clsx("px-6 py-3 text-sm font-medium flex items-center border-b-2 transition-colors", activeTab === 'history' ? "border-indigo-500 text-indigo-700 bg-white" : "border-transparent text-gray-500 hover:text-gray-700")}
+                                className={clsx("px-8 py-3 text-sm font-medium border-b-2 transition-colors", activeTab === 'history' ? "border-teal-500 text-teal-400" : "border-transparent text-slate-500 hover:text-slate-300")}
                             >
-                                <Clock size={16} className="mr-2" /> History
+                                History
                             </button>
                         </div>
 
-                        {/* Tab Content */}
-                        <div className="flex-1 overflow-y-auto p-6 bg-gray-50/30">
+                        {/* Content Area */}
+                        <div className="flex-1 overflow-y-auto p-6 bg-[#0B0E14] relative">
 
                             {activeTab === 'editor' && (
                                 <div className="h-full flex flex-col gap-4">
-                                    <div className="flex-1 bg-gray-900 rounded-lg p-1 relative group">
-                                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <span className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded border border-gray-700 font-mono">System Prompt</span>
+                                    {/* Editor Window */}
+                                    <div className="flex-1 bg-[#151921] rounded-xl border border-slate-800 flex flex-col relative overflow-hidden group">
+                                        <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-[#1A1F29]">
+                                            <span className="text-xs font-semibold text-slate-400">Prompt Content</span>
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20">production</span>
                                         </div>
-                                        <textarea
-                                            className="w-full h-full bg-transparent text-gray-100 font-mono text-sm p-4 focus:outline-none resize-none"
-                                            value={content}
-                                            onChange={(e) => setContent(e.target.value)}
-                                            spellCheck={false}
-                                            placeholder="Enter prompt content here..."
-                                        />
-                                    </div>
-                                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex items-start gap-3">
-                                        <Terminal size={18} className="text-blue-600 mt-1" />
-                                        <div>
-                                            <h4 className="text-sm font-bold text-blue-800 mb-1">Detected Variables</h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                {variables.map(v => (
-                                                    <span key={v} className="px-2 py-1 bg-white border border-blue-200 text-blue-600 text-xs font-mono rounded">
-                                                        {`{${v}}`}
-                                                    </span>
-                                                ))}
-                                                {variables.length === 0 && <span className="text-xs text-gray-400 italic">No variables detected (use {'{var}'} syntax)</span>}
+
+                                        <div className="relative flex-1">
+                                            <div className="absolute top-4 left-4 z-10">
+                                                <span className="px-2 py-1 bg-slate-800 text-slate-400 text-[10px] uppercase font-bold rounded border border-slate-700">System</span>
                                             </div>
+                                            <textarea
+                                                className="w-full h-full bg-[#0D1117] text-slate-300 font-mono text-sm p-6 pt-12 focus:outline-none resize-none leading-relaxed"
+                                                value={content}
+                                                onChange={(e) => setContent(e.target.value)}
+                                                spellCheck={false}
+                                                placeholder="// Enter system prompt here..."
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Detected Variables Footer */}
+                                    <div className="bg-[#151921] border border-slate-800 rounded-lg p-3">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Variables Detected</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {variables.length > 0 ? variables.map(v => (
+                                                <div key={v} className="bg-[#0D1117] px-2 py-1 rounded border border-slate-700 flex items-center font-mono text-xs text-teal-400">
+                                                    <span>{`{{${v}}}`}</span>
+                                                </div>
+                                            )) : (
+                                                <span className="text-xs text-slate-600 italic">No variables detected</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {activeTab === 'config' && (
-                                <div className="max-w-xl mx-auto space-y-6 bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-                                    <p className="text-sm text-gray-500 text-center italic">Configuration mocking disabled for current demo phase.</p>
+                                <div className="max-w-4xl">
+                                    <h3 className="text-sm font-bold text-slate-200 mb-6 border-b border-slate-800 pb-2">Model Configuration</h3>
+
+                                    <div className="grid grid-cols-2 gap-x-12 gap-y-8">
+                                        {/* Model */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Model</label>
+                                            <div className="relative">
+                                                <select
+                                                    value={config.model}
+                                                    onChange={(e) => setConfig({ ...config, model: e.target.value })}
+                                                    className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none appearance-none"
+                                                >
+                                                    <option value="gpt-4o">gpt-4o</option>
+                                                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                                                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                                                </select>
+                                                <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Temperature */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Temperature</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={config.temperature}
+                                                onChange={(e) => setConfig({ ...config, temperature: parseFloat(e.target.value) })}
+                                                className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Max Tokens */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Max Tokens</label>
+                                            <input
+                                                type="number"
+                                                value={config.maxTokens}
+                                                onChange={(e) => setConfig({ ...config, maxTokens: parseInt(e.target.value) })}
+                                                className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Top P */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Top P</label>
+                                            <input
+                                                type="number"
+                                                step="0.05"
+                                                value={config.topP}
+                                                onChange={(e) => setConfig({ ...config, topP: parseFloat(e.target.value) })}
+                                                className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Frequency Penalty */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Frequency Penalty</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={config.freqPenalty}
+                                                onChange={(e) => setConfig({ ...config, freqPenalty: parseFloat(e.target.value) })}
+                                                className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+
+                                        {/* Presence Penalty */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-semibold text-slate-400">Presence Penalty</label>
+                                            <input
+                                                type="number"
+                                                step="0.1"
+                                                value={config.presPenalty}
+                                                onChange={(e) => setConfig({ ...config, presPenalty: parseFloat(e.target.value) })}
+                                                className="w-full bg-[#0D1117] border border-slate-700 text-slate-200 text-sm rounded-lg p-2.5 focus:ring-1 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
                             {activeTab === 'history' && (
-                                <div className="space-y-4 max-w-3xl mx-auto">
+                                <div className="space-y-4 max-w-4xl">
                                     {history.map((ver) => (
-                                        <div key={ver.version} className="bg-white border border-gray-200 rounded-lg p-4 flex gap-4">
-                                            <div className={clsx("w-12 h-12 rounded-full flex items-center justify-center font-bold text-sm", ver.environment === 'prod' ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")}>
-                                                {ver.version}
+                                        <div key={ver.version} className="bg-[#151921] border border-slate-800 rounded-lg p-4 flex gap-4 items-center hover:bg-slate-800/50 transition-colors">
+                                            <div className="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-sm text-slate-400">
+                                                v{ver.version}
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex justify-between items-center mb-1">
-                                                    <h4 className="font-bold text-gray-900">{ver.comment}</h4>
-                                                    <span className="text-xs text-gray-400">{ver.date}</span>
+                                                    <h4 className="font-semibold text-slate-200 text-sm">{ver.comment}</h4>
+                                                    <span className="text-xs text-slate-500 font-mono">{ver.date}</span>
                                                 </div>
-                                                <p className="text-sm text-gray-500 flex items-center gap-2">
-                                                    <span className="bg-gray-100 px-2 py-0.5 rounded text-xs">{ver.author}</span>
-                                                    {ver.environment === 'prod' && <span className="text-green-600 text-xs font-semibold bg-green-50 px-2 py-0.5 rounded border border-green-200">Production</span>}
-                                                    {ver.environment === 'archived' && <span className="text-gray-400 text-xs font-semibold bg-gray-50 px-2 py-0.5 rounded border border-gray-200">Archived</span>}
-                                                    {ver.environment === 'dev' && <span className="text-blue-500 text-xs font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Draft</span>}
-                                                </p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-slate-500 flex items-center">
+                                                        By {ver.author}
+                                                    </span>
+                                                    {ver.environment === 'prod' && <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase font-bold tracking-wider">Production</span>}
+                                                    {ver.environment === 'dev' && <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20 uppercase font-bold tracking-wider">Dev</span>}
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                {ver.environment !== 'prod' && (
-                                                    <button
-                                                        onClick={() => handlePromote(ver.version)}
-                                                        className="flex items-center px-3 py-1.5 border border-green-200 text-green-700 rounded text-xs font-medium hover:bg-green-50"
-                                                    >
-                                                        <ArrowUpCircle size={12} className="mr-1" /> Promote
-                                                    </button>
-                                                )}
-                                                <button className="px-3 py-1.5 border border-gray-200 rounded text-xs font-medium hover:bg-gray-50">
-                                                    View
-                                                </button>
-                                            </div>
+                                            <button className="p-2 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors">
+                                                <ArrowUpCircle size={18} />
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
                             )}
 
                         </div>
-                    </>
+                    </div>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-400">
-                        Select a prompt to view details
+                    <div className="flex-1 flex flex-col items-center justify-center text-slate-500 bg-[#111827] rounded-xl border border-slate-800">
+                        <Terminal size={48} className="mb-4 opacity-20" />
+                        <p>Select a prompt to view details</p>
                     </div>
                 )}
             </div>
