@@ -105,7 +105,22 @@ const Prompts = () => {
     const handleVersionSelect = (ver: PromptVersion) => {
         setViewingVersion(ver.version);
         setContent(ver.content);
-        if (ver.model_parameters) setConfig(ver.model_parameters);
+
+        // Parse MLflow tags/config back to UI state
+        // Backend now returns combined model_parameters and tags
+        const newConfig = { ...config };
+
+        if (ver.model_parameters) {
+            // Direct map if available
+            if (ver.model_parameters.model) newConfig.model = ver.model_parameters.model;
+            if (ver.model_parameters.temperature) newConfig.temperature = ver.model_parameters.temperature;
+            if (ver.model_parameters.maxTokens) newConfig.maxTokens = ver.model_parameters.maxTokens;
+            if (ver.model_parameters.topP) newConfig.topP = ver.model_parameters.topP;
+            if (ver.model_parameters.freqPenalty) newConfig.freqPenalty = ver.model_parameters.freqPenalty;
+            if (ver.model_parameters.presPenalty) newConfig.presPenalty = ver.model_parameters.presPenalty;
+        }
+
+        setConfig(newConfig);
         setActiveTab('editor'); // Switch to editor to see the content
     };
 

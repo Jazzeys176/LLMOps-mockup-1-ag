@@ -9,6 +9,7 @@ azure-storage-file-datalake
 databricks-sql-connector
 openai
 mlflow
+azureml-mlflow
 boto3
 python-multipart
 
