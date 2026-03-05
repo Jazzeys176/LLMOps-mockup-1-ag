@@ -52,3 +52,40 @@ class TraceBubble(BaseModel):
     content: str
     timestamp: str
     trace_id: str
+
+
+# Live Dashboard Models (from JSONL metrics)
+class DailyActiveUsers(BaseModel):
+    date: str
+    users: int
+
+
+class ModelUsage(BaseModel):
+    model: str
+    tokens: int
+    cost: float
+    count: int
+    avg_latency: float
+
+
+class TraceByName(BaseModel):
+    name: str
+    count: int
+
+
+class CostByModel(BaseModel):
+    name: str
+    cost: float
+
+
+class LiveDashboardStats(BaseModel):
+    """Dashboard stats computed from standard_trace_logs.jsonl"""
+    computed_at: Optional[str] = None
+    total_traces: int
+    avg_latency: float
+    total_tokens: int
+    total_cost: float
+    daily_active_users: List[DailyActiveUsers] = []
+    model_usage: List[ModelUsage] = []
+    traces_by_name: List[TraceByName] = []
+    cost_by_model: List[CostByModel] = []

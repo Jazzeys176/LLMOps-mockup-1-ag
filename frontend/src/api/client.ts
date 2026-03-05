@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1/analytics';
+const API_BASE_URL = 'http://localhost:8001/api/v1/analytics';
 
 // Types matching Backend Pydantic Models
 export interface DashboardStats {
@@ -57,6 +57,42 @@ export interface EvaluationLog {
     status: string;
 }
 
+// Live Dashboard Types (from JSONL metrics)
+export interface DailyActiveUsers {
+    date: string;
+    users: number;
+}
+
+export interface ModelUsage {
+    model: string;
+    tokens: number;
+    cost: number;
+    count: number;
+    avg_latency: number;
+}
+
+export interface TraceByName {
+    name: string;
+    count: number;
+}
+
+export interface CostByModel {
+    name: string;
+    cost: number;
+}
+
+export interface LiveDashboardStats {
+    computed_at: string | null;
+    total_traces: number;
+    avg_latency: number;
+    total_tokens: number;
+    total_cost: number;
+    daily_active_users: DailyActiveUsers[];
+    model_usage: ModelUsage[];
+    traces_by_name: TraceByName[];
+    cost_by_model: CostByModel[];
+}
+
 // Client Implementation
 export const apiClient = {
     async getStats(): Promise<DashboardStats> {
@@ -104,6 +140,12 @@ export const apiClient = {
     async getEvaluationLogs(limit: number = 50): Promise<EvaluationLog[]> {
         const response = await fetch(`${API_BASE_URL.replace('/analytics', '/evaluations')}/logs?limit=${limit}`);
         if (!response.ok) throw new Error('Failed to fetch evaluation logs');
+        return response.json();
+    },
+
+    async getLiveStats(): Promise<LiveDashboardStats> {
+        const response = await fetch(`${API_BASE_URL}/dashboard-live`);
+        if (!response.ok) throw new Error('Failed to fetch live dashboard stats');
         return response.json();
     }
 };

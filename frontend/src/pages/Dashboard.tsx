@@ -16,7 +16,7 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { apiClient } from '../api/client'; // Import API Client
+import { apiClient, type LiveDashboardStats } from '../api/client'; // Import API Client
 
 const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass = "text-indigo-400 bg-indigo-500/10" }: any) => (
     <div className="bg-slate-900/50 p-6 rounded-xl shadow-lg border border-slate-800 flex items-start justify-between backdrop-blur-sm">
@@ -40,14 +40,20 @@ const KPICard = ({ title, value, subtext, icon: Icon, trend, colorClass = "text-
 const Dashboard = () => {
     // State for Real Data
     const [stats, setStats] = useState<any>(null);
+    const [liveStats, setLiveStats] = useState<LiveDashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Fetch Stats on Mount
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const data = await apiClient.getStats();
-                setStats(data);
+                // Fetch both regular stats and live stats in parallel
+                const [regularData, liveData] = await Promise.all([
+                    apiClient.getStats(),
+                    apiClient.getLiveStats()
+                ]);
+                setStats(regularData);
+                setLiveStats(liveData);
             } catch (err) {
                 console.error("Failed to fetch dashboard stats", err);
             } finally {
@@ -61,19 +67,15 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // ... (Charts data remains mock for now as per API current implementation limit, or can be static)
-    // For this step, we focus on the KPI Cards integration.
+    // Daily Active Users - from live stats (JSONL)
+    // Transform date format for better display
+    const dailyActiveUsers = (liveStats?.daily_active_users || []).map(item => ({
+        name: item.date.slice(5), // Show MM-DD format
+        users: item.users
+    }));
 
-    // Mock Chart Data (To be replaced with real endpoints in future iterations if API supports it)
-    const dailyActiveUsers = [
-        { name: 'Mon', users: 1200 },
-        { name: 'Tue', users: 1350 },
-        { name: 'Wed', users: 1280 },
-        { name: 'Thu', users: 1420 },
-        { name: 'Fri', users: 1500 },
-        { name: 'Sat', users: 1100 },
-        { name: 'Sun', users: 950 },
-    ];
+    // Model Usage from live stats (JSONL)
+    const liveModelUsage = liveStats?.model_usage || [];
 
     const responseQuality = [
         { name: 'Excellent', value: 35, color: '#10b981' }, // emerald-500
@@ -82,8 +84,9 @@ const Dashboard = () => {
         { name: 'Poor', value: 10, color: '#ef4444' },      // red-500
     ];
 
-    const tracesByName = stats?.traces_by_name || [];
-    const costByModel = stats?.cost_by_model || [];
+    // Traces by Name and Cost by Model - from live stats (JSONL)
+    const tracesByName = liveStats?.traces_by_name || [];
+    const costByModel = liveStats?.cost_by_model || [];
 
     // ... (rest of mock chart data)
 
@@ -103,17 +106,24 @@ const Dashboard = () => {
     return (
         <div className="space-y-6">
             {/* 1. Header & Context */}
-            <div>
-                <h1 className="text-2xl font-bold text-slate-100">Dashboard</h1>
-                <p className="text-slate-400">LLM observability and monitoring</p>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-100">Dashboard</h1>
+                    <p className="text-slate-400">LLM observability and monitoring</p>
+                </div>
+                {liveStats?.computed_at && (
+                    <div className="text-xs text-slate-500 bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                        Last updated: {new Date(liveStats.computed_at).toLocaleString()}
+                    </div>
+                )}
             </div>
 
-            {/* 2. KPI Cards Row - Using Real Data */}
+            {/* 2. KPI Cards Row - Using Live Data from JSONL */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <KPICard title="Total Traces" value={stats?.total_traces || 0} subtext="All time" icon={Activity} colorClass="text-blue-400 bg-blue-500/10" />
-                <KPICard title="Total Cost" value={`$${stats?.total_cost || 0}`} subtext="API costs" icon={DollarSign} colorClass="text-emerald-400 bg-emerald-500/10" />
-                <KPICard title="Total Tokens" value={(stats?.total_tokens || 0).toLocaleString()} subtext="Input + Output" icon={Database} colorClass="text-purple-400 bg-purple-500/10" />
-                <KPICard title="Avg Latency" value={`${stats?.avg_latency || 0}ms`} subtext="Per trace" icon={Clock} trend={3} colorClass="text-amber-400 bg-amber-500/10" />
+                <KPICard title="Total Traces" value={(liveStats?.total_traces || 0).toLocaleString()} subtext="All time" icon={Activity} colorClass="text-blue-400 bg-blue-500/10" />
+                <KPICard title="Total Cost" value={`$${(liveStats?.total_cost || 0).toFixed(6)}`} subtext="API costs" icon={DollarSign} colorClass="text-emerald-400 bg-emerald-500/10" />
+                <KPICard title="Total Tokens" value={(liveStats?.total_tokens || 0).toLocaleString()} subtext="Input + Output" icon={Database} colorClass="text-purple-400 bg-purple-500/10" />
+                <KPICard title="Avg Latency" value={`${(liveStats?.avg_latency || 0).toFixed(1)}ms`} subtext="Per trace" icon={Clock} colorClass="text-amber-400 bg-amber-500/10" />
 
                 <KPICard title="User Satisfaction" value="NA" subtext="Stable" icon={ThumbsUp} trend={3} colorClass="text-teal-400 bg-teal-500/10" />
                 <KPICard title="Task Completion" value="NA" subtext="Users completing task" icon={CheckCircle2} trend={NaN} colorClass="text-indigo-400 bg-indigo-500/10" />
@@ -327,7 +337,7 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            {/* 7. Model Usage Details */}
+            {/* 7. Model Usage Details - Live Data from JSONL */}
             <div className="bg-slate-900/50 p-6 rounded-xl shadow-lg border border-slate-800">
                 <h3 className="text-lg font-bold text-slate-100 mb-4">Model Usage Details</h3>
                 <div className="overflow-x-auto">
@@ -335,16 +345,20 @@ const Dashboard = () => {
                         <thead className="text-xs text-slate-500 uppercase bg-slate-800/50">
                             <tr>
                                 <th className="px-6 py-3 rounded-l-lg">Model</th>
+                                <th className="px-6 py-3">Traces</th>
                                 <th className="px-6 py-3">Tokens</th>
-                                <th className="px-6 py-3 rounded-r-lg">Cost (USD)</th>
+                                <th className="px-6 py-3">Cost (USD)</th>
+                                <th className="px-6 py-3 rounded-r-lg">Avg Latency</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800">
-                            {modelUsage.map((item: any) => (
-                                <tr key={item.name} className="hover:bg-slate-800/30 transition-colors">
-                                    <td className="px-6 py-4 font-medium text-slate-200">{item.name}</td>
+                            {liveModelUsage.map((item: any) => (
+                                <tr key={item.model} className="hover:bg-slate-800/30 transition-colors">
+                                    <td className="px-6 py-4 font-medium text-slate-200">{item.model}</td>
+                                    <td className="px-6 py-4 font-mono">{Number(item.count).toLocaleString()}</td>
                                     <td className="px-6 py-4 font-mono">{Number(item.tokens).toLocaleString()}</td>
-                                    <td className="px-6 py-4 font-mono text-slate-200">${item.cost}</td>
+                                    <td className="px-6 py-4 font-mono text-slate-200">${item.cost.toFixed(6)}</td>
+                                    <td className="px-6 py-4 font-mono">{item.avg_latency.toFixed(1)}ms</td>
                                 </tr>
                             ))}
                         </tbody>

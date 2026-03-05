@@ -24,11 +24,11 @@ const Sidebar = ({ isOpen }: { isOpen: boolean; toggle: () => void }) => {
         { label: 'Tracing', icon: Activity, path: '/tracing' },
         { label: 'Sessions', icon: Clock, path: '/sessions' },
         { label: 'Evaluators', icon: ClipboardCheck, path: '/evaluators' },
-        // { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
+        { label: 'Annotation Queues', icon: ListTodo, path: '/annotation_queue' },
         { label: 'Prompts', icon: MessageSquare, path: '/prompts' },
-        // { label: 'Datasets', icon: Database, path: '/datasets' },
-        // { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
-        // { label: 'Audit', icon: FileText, path: '/audit' },
+        { label: 'Datasets', icon: Database, path: '/datasets' },
+        { label: 'Alerts', icon: AlertTriangle, path: '/alerts' },
+        { label: 'Audit', icon: FileText, path: '/audit' }
     ];
 
     return (

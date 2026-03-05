@@ -1,9 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
+from pathlib import Path
 from backend.db.client import query_db_dict
 from backend.api.models.analytics import (
-    DashboardStats, TraceSchema, SessionSchema, TraceBubble, TraceScores
+    DashboardStats, TraceSchema, SessionSchema, TraceBubble, TraceScores,
+    LiveDashboardStats
 )
+from backend.services.metrics_aggregator import get_metrics
 import json
 import math
 
@@ -247,5 +250,24 @@ async def get_session_traces(session_id: str):
                 "timestamp": ts,
                 "trace_id": t["trace_id"]
             })
-            
+
     return bubbles
+
+
+@router.get("/dashboard-live", response_model=LiveDashboardStats)
+async def get_live_dashboard_stats():
+    """
+    Get live dashboard metrics from standard_trace_logs.jsonl.
+
+    This endpoint reads pre-computed metrics from metrics.json which is
+    updated every 10 seconds by the background metrics worker.
+
+    Returns metrics including:
+    - total_traces: Total number of traces
+    - avg_latency: Average latency in milliseconds
+    - total_tokens: Total tokens used
+    - total_cost: Total cost in USD
+    - daily_active_users: Daily active user counts
+    - model_usage: Per-model usage statistics
+    """
+    return get_metrics()

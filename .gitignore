@@ -38,3 +38,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+data/raw_trace_logs_1.json
+data/Standard_traces_1.json
+backend/demo.json
+backend/metrics.json
+backend/raw_trace_logs.jsonl
+backend/Standard_traces.jsonl
+backend/standard_trace_logs.jsonl
+Dashboard_working.md
+text2.txt
+text3.txt
+trace_normalization.md
