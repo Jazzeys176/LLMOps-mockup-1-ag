@@ -50,3 +50,6 @@ Dashboard_working.md
 text2.txt
 text3.txt
 trace_normalization.md
+start_app.sh
+*.md
+Makefile

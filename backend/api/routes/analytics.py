@@ -6,9 +6,10 @@ from backend.api.models.analytics import (
     DashboardStats, TraceSchema, SessionSchema, TraceBubble, TraceScores,
     LiveDashboardStats
 )
-from backend.services.metrics_aggregator import get_metrics
+from backend.services.metrics_aggregator import get_metrics, calculate_cost
 import json
 import math
+import datetime
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
@@ -105,78 +106,154 @@ async def get_traces(
     search: Optional[str] = None
 ):
     offset = (page - 1) * limit
-    params = []
-    where_clause = ""
     
-    if search:
-        where_clause = "WHERE trace_name ILIKE ? OR input ILIKE ?"
-        params.extend([f"%{search}%", f"%{search}%"])
+    # Path to the standard trace logs jsonl file
+    # Ensure this path logic resolves to wherever standard_trace_logs.jsonl resides
+    # based on backend structure. Given it's at backend/standard_trace_logs.jsonl
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    jsonl_path = base_dir / "standard_trace_logs.jsonl"
     
-    query = f"""
-    SELECT * 
-    FROM traces 
-    {where_clause}
-    ORDER BY timestamp DESC 
-    LIMIT {limit} OFFSET {offset}
-    """
+    traces = []
     
-    # Need to fetch evaluations for scores
-    raw_traces = query_db_dict(query, tuple(params))
+    if jsonl_path.exists():
+        with open(jsonl_path, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    t = json.loads(line)
+                    # Apply search filter if provided
+                    if search:
+                        search_lower = search.lower()
+                        name_match = search_lower in t.get("trace_name", "").lower()
+                        input_match = search_lower in json.dumps(t.get("input", {})).lower()
+                        if not (name_match or input_match):
+                            continue
+                    traces.append(t)
+                except json.JSONDecodeError:
+                    continue
+
+    # Sort traces descending by timestamp
+    traces.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
     
-    results = []
-    for t in raw_traces:
-        # Mock scores extraction or join query
-        # For efficiency, we really should join, but for now individual query is safer for complex json handling
-        # Or just random/mock scores if not in DB
+    # Apply pagination
+    paginated_raw = traces[offset : offset + limit]
+    
+    # Formatting helper function for input/output objects
+    def format_io(io_data):
+        if not io_data:
+            return ""
+        if isinstance(io_data, dict):
+            # Try to grab the common 'query', 'answer', or 'text' fields
+            if "query" in io_data: return io_data["query"]
+            if "answer" in io_data: return io_data["answer"]
+            if "text" in io_data: return io_data["text"]
+            return json.dumps(io_data)
+        return str(io_data)
         
-        # Simple mapper
+    def safe_format_time(ts_ms):
+        if not ts_ms: return ""
+        try:
+            dt = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
+            return dt.strftime("%m/%d/%Y, %H:%M:%S")
+        except:
+            return str(ts_ms)
+            
+    results = []
+    for t in paginated_raw:
+        usage = t.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        completion_tokens = usage.get("completion_tokens") or 0
+        total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+        
+        # Determine cost
+        cost = calculate_cost(t.get("model", ""), prompt_tokens, completion_tokens)
+        
+        # Provide fallback/mock scores as previously done or if embedded in trace
         results.append({
-            "id": t["trace_id"],
-            "timestamp": t["timestamp"].strftime("%m/%d/%Y, %H:%M:%S") if hasattr(t["timestamp"], 'strftime') else str(t["timestamp"]),
-            "name": t["trace_name"],
-            "input": t["input"],
-            "output": t["output"],
-            "latency": f"{int(t['latency_ms'])}ms",
-            "tokens": f"{t['tokens_total']:,}",
-            "cost": f"${t['cost']:.6f}",
+            "id": t.get("trace_id", ""),
+            "timestamp": safe_format_time(t.get("timestamp")),
+            "name": t.get("trace_name", "Unknown"),
+            "input": format_io(t.get("input", {})),
+            "output": format_io(t.get("output", {})),
+            "latency": f"{int(t.get('latency_ms', 0))}ms",
+            "tokens": f"{total_tokens:,}",
+            "cost": f"${cost:.6f}",
             "scores": {
                 "hallucination": 0.05,
                 "context_relevance": 0.95,
                 "conciseness": 0.90
-            }, # In a real implementation, we'd query the evaluations table
-            "status": t["status"],
-            "user_id": t["user_id"],
-            "session_id": t["session_id"]
+            },
+            "status": t.get("status", "unknown"),
+            "user_id": t.get("user_id", "unknown"),
+            "session_id": t.get("session_id", "unknown")
         })
         
     return results
 
 @router.get("/traces/{trace_id}", response_model=TraceSchema)
 async def get_trace_detail(trace_id: str):
-    query = "SELECT * FROM traces WHERE trace_id = ?"
-    traces = query_db_dict(query, (trace_id,))
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    jsonl_path = base_dir / "standard_trace_logs.jsonl"
     
-    if not traces:
+    target_trace = None
+    if jsonl_path.exists():
+        with open(jsonl_path, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    t = json.loads(line)
+                    if t.get("trace_id") == trace_id:
+                        target_trace = t
+                        break
+                except json.JSONDecodeError:
+                    continue
+                    
+    if not target_trace:
         raise HTTPException(status_code=404, detail="Trace not found")
         
-    t = traces[0]
+    # Helpers
+    def format_io(io_data):
+        if not io_data: return ""
+        if isinstance(io_data, dict):
+            if "query" in io_data: return io_data["query"]
+            if "answer" in io_data: return io_data["answer"]
+            if "text" in io_data: return io_data["text"]
+            return json.dumps(io_data)
+        return str(io_data)
+        
+    def safe_format_time(ts_ms):
+        if not ts_ms: return ""
+        try:
+            dt = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
+            return dt.strftime("%m/%d/%Y, %H:%M:%S")
+        except:
+            return str(ts_ms)
+            
+    usage = target_trace.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens") or 0
+    completion_tokens = usage.get("completion_tokens") or 0
+    total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+    cost = calculate_cost(target_trace.get("model", ""), prompt_tokens, completion_tokens)
+    
     return {
-        "id": t["trace_id"],
-        "timestamp": t["timestamp"].strftime("%m/%d/%Y, %H:%M:%S") if hasattr(t["timestamp"], 'strftime') else str(t["timestamp"]),
-        "name": t["trace_name"],
-        "input": t["input"],
-        "output": t["output"],
-        "latency": f"{int(t['latency_ms'])}ms",
-        "tokens": f"{t['tokens_total']:,}",
-        "cost": f"${t['cost']:.6f}",
+        "id": target_trace.get("trace_id", ""),
+        "timestamp": safe_format_time(target_trace.get("timestamp")),
+        "name": target_trace.get("trace_name", "Unknown"),
+        "input": format_io(target_trace.get("input", {})),
+        "output": format_io(target_trace.get("output", {})),
+        "latency": f"{int(target_trace.get('latency_ms', 0))}ms",
+        "tokens": f"{total_tokens:,}",
+        "cost": f"${cost:.6f}",
         "scores": {
             "hallucination": 0.05,
             "context_relevance": 0.95,
             "conciseness": 0.90
         },
-        "status": t["status"],
-        "user_id": t["user_id"],
-        "session_id": t["session_id"]
+        "status": target_trace.get("status", "unknown"),
+        "user_id": target_trace.get("user_id", "unknown"),
+        "session_id": target_trace.get("session_id", "unknown")
     }
 
 @router.get("/sessions", response_model=List[SessionSchema])
@@ -186,33 +263,87 @@ async def get_sessions(
     search: Optional[str] = None
 ):
     offset = (page - 1) * limit
-    params = []
-    where_clause = ""
     
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    jsonl_path = base_dir / "standard_trace_logs.jsonl"
+    
+    # Store aggregated sessions: session_id -> {metrics}
+    sessions_map = {}
+    
+    from backend.services.metrics_aggregator import calculate_cost
+
+    if jsonl_path.exists():
+        with open(jsonl_path, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    t = json.loads(line)
+                    session_id = t.get("session_id")
+                    if not session_id:
+                        continue
+                        
+                    user_id = t.get("user_id", "unknown")
+                    timestamp = t.get("timestamp", 0)
+                    
+                    usage = t.get("usage", {})
+                    prompt_tokens = usage.get("prompt_tokens") or 0
+                    completion_tokens = usage.get("completion_tokens") or 0
+                    total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+                    cost = calculate_cost(t.get("model", ""), prompt_tokens, completion_tokens)
+                    
+                    if session_id not in sessions_map:
+                        sessions_map[session_id] = {
+                            "session_id": session_id,
+                            "user_id": user_id,
+                            "trace_count": 0,
+                            "total_tokens": 0,
+                            "total_cost": 0.0,
+                            "created_at": timestamp
+                        }
+                    
+                    s = sessions_map[session_id]
+                    s["trace_count"] += 1
+                    s["total_tokens"] += total_tokens
+                    s["total_cost"] += cost
+                    if timestamp < s["created_at"]:
+                        s["created_at"] = timestamp
+                        
+                except Exception:
+                    continue
+                    
+    # Filter sessions
+    filtered_sessions = []
     if search:
-        # Searching by user or session_id
-        where_clause = "WHERE user_id ILIKE ? OR session_id ILIKE ?"
-        params.extend([f"%{search}%", f"%{search}%"])
+        search_lower = search.lower()
+        for session in sessions_map.values():
+            if search_lower in session["session_id"].lower() or search_lower in session["user_id"].lower():
+                filtered_sessions.append(session)
+    else:
+        filtered_sessions = list(sessions_map.values())
         
-    query = f"""
-    SELECT * 
-    FROM sessions 
-    {where_clause}
-    ORDER BY created_at DESC 
-    LIMIT {limit} OFFSET {offset}
-    """
+    # Sort descending by created_at
+    filtered_sessions.sort(key=lambda x: x["created_at"], reverse=True)
     
-    raw_sessions = query_db_dict(query, tuple(params))
+    paginated_sessions = filtered_sessions[offset : offset + limit]
     
+    def safe_format_time(ts_ms):
+        if not ts_ms: return ""
+        try:
+            dt = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
+            return dt.strftime("%m/%d/%Y, %H:%M:%S")
+        except:
+            return str(ts_ms)
+            
     results = []
-    for s in raw_sessions:
+    for s in paginated_sessions:
         results.append({
             "id": s["session_id"],
             "user": s["user_id"],
             "traces": s["trace_count"],
             "totalTokens": f"{s['total_tokens']:,}",
             "totalCost": f"${s['total_cost']:.6f}",
-            "created": s["created_at"].strftime("%m/%d/%Y, %H:%M:%S") if hasattr(s["created_at"], 'strftime') else str(s["created_at"])
+            "created": safe_format_time(s["created_at"])
         })
         
     return results
@@ -222,33 +353,66 @@ async def get_session_traces(session_id: str):
     """
     Get interactions for a session to render chat bubbles.
     """
-    query = """
-    SELECT trace_id, input, output, timestamp 
-    FROM traces 
-    WHERE session_id = ? 
-    ORDER BY timestamp ASC
-    """
-    traces = query_db_dict(query, (session_id,))
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    jsonl_path = base_dir / "standard_trace_logs.jsonl"
     
+    traces = []
+    if jsonl_path.exists():
+        with open(jsonl_path, "r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    t = json.loads(line)
+                    if t.get("session_id") == session_id:
+                        traces.append(t)
+                except json.JSONDecodeError:
+                    continue
+                    
+    # Sort ascending by timestamp for chronological chat flow
+    traces.sort(key=lambda x: x.get("timestamp", 0))
+    
+    # Helper for extracting text
+    def extract_text(io_data):
+        if not io_data: return ""
+        if isinstance(io_data, dict):
+            if "query" in io_data: return io_data["query"]
+            if "answer" in io_data: return io_data["answer"]
+            if "text" in io_data: return io_data["text"]
+            return json.dumps(io_data)
+        return str(io_data)
+        
+    def format_bubble_time(ts_ms):
+        if not ts_ms: return ""
+        try:
+            dt = datetime.datetime.utcfromtimestamp(ts_ms / 1000)
+            return dt.strftime("%H:%M:%S")
+        except:
+            return str(ts_ms)
+            
     bubbles = []
     for t in traces:
-        ts = t["timestamp"].strftime("%H:%M:%S") if hasattr(t["timestamp"], 'strftime') else str(t["timestamp"])
+        ts = format_bubble_time(t.get("timestamp"))
+        input_text = extract_text(t.get("input", {}))
+        output_text = extract_text(t.get("output", {}))
+        trace_uid = t.get("trace_id", "")
         
         # User Bubble
-        bubbles.append({
-            "role": "user",
-            "content": t["input"],
-            "timestamp": ts,
-            "trace_id": t["trace_id"]
-        })
-        
-        # AI Bubble (if output exists)
-        if t["output"]:
+        if input_text:
+            bubbles.append({
+                "role": "user",
+                "content": input_text,
+                "timestamp": ts,
+                "trace_id": trace_uid
+            })
+            
+        # AI Bubble
+        if output_text:
             bubbles.append({
                 "role": "ai",
-                "content": t["output"],
+                "content": output_text,
                 "timestamp": ts,
-                "trace_id": t["trace_id"]
+                "trace_id": trace_uid
             })
 
     return bubbles
