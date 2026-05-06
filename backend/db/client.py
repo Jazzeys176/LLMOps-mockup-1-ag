@@ -74,6 +74,53 @@ def init_db():
     """
     execute_query(create_prompts_table)
 
+    create_evaluators_table = """
+    CREATE TABLE IF NOT EXISTS evaluators (
+        id VARCHAR PRIMARY KEY,
+        name VARCHAR,
+        score_name VARCHAR,
+        template_id VARCHAR,
+        target VARCHAR,
+        status VARCHAR,
+        variable_mapping JSON,
+        execution JSON
+    );
+    """
+    execute_query(create_evaluators_table)
+
+    create_evaluations_table = """
+    CREATE TABLE IF NOT EXISTS evaluations (
+        id VARCHAR PRIMARY KEY,
+        trace_id VARCHAR,
+        evaluator_id VARCHAR,
+        template_id VARCHAR,
+        deployments_used JSON,
+        individual_scores JSON,
+        ensemble_score DOUBLE,
+        variance DOUBLE,
+        unstable BOOLEAN,
+        score DOUBLE,
+        status VARCHAR,
+        evaluation_cost_usd DOUBLE,
+        duration_ms DOUBLE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """
+    execute_query(create_evaluations_table)
+
+    create_templates_table = """
+    CREATE TABLE IF NOT EXISTS templates (
+        id VARCHAR PRIMARY KEY,
+        name VARCHAR,
+        version VARCHAR,
+        description TEXT,
+        model VARCHAR,
+        inputs JSON,
+        template TEXT
+    );
+    """
+    execute_query(create_templates_table)
+
 # Auto-initialize on import for this demo
 try:
     init_db()

@@ -38,12 +38,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from backend.api.routes import ingestion, analytics, evaluations, drift, prompts
+from backend.api.routes import ingestion, analytics, evaluations, drift, prompts, evaluators, templates
 # app.include_router(ingestion.router)
 app.include_router(analytics.router)
 app.include_router(evaluations.router)
 app.include_router(drift.router)
 app.include_router(prompts.router)
+app.include_router(evaluators.router)
+app.include_router(templates.router)
 
 
 @app.get("/health")

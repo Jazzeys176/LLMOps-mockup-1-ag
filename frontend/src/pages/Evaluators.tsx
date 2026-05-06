@@ -1,62 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ExternalLink, Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import clsx from 'clsx';
-import { apiClient, type EvaluationLog } from '../api/client';
+import { apiClient, type EvaluationLog, type Evaluator, type Template } from '../api/client';
 
 const Evaluators = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'evaluators' | 'templates' | 'logs'>('evaluators');
 
-    // --- Mock Data ---
-
-    const activeEvaluators = [
-        {
-            id: 'eval_1',
-            name: 'Production Hallucination Check',
-            status: 'Active',
-            template: 'Hallucination Detector',
-            scoreName: 'hallucination',
-            target: 'TRACE',
-            sampling: '20%',
-            created: '13/01/2026'
-        },
-        {
-            id: 'eval_2',
-            name: 'Context Relevance Monitor',
-            status: 'Active',
-            template: 'Context Relevance',
-            scoreName: 'context_relevance',
-            target: 'TRACE',
-            sampling: '50%',
-            created: '18/01/2026'
-        }
-    ];
-
-    const templates = [
-        {
-            id: 'tmpl_1',
-            name: 'Hallucination Detector',
-            version: 'v1',
-            description: 'Detects factual inconsistencies in model responses',
-            template: 'Given the context: {{context}} And the response: {{response}} Rate the hallucination level from 0 (no hallucination) to 1 (complete hallucination).',
-            examples: ['Model: gpt-4o-mini', '{{context}}', '{{response}}'],
-            lastUpdated: '18/01/2026, 13:32:35'
-        },
-        {
-            id: 'tmpl_2',
-            name: 'Context Relevance',
-            version: 'v1',
-            description: 'Evaluates how relevant the retrieved context is to the query',
-            template: 'Query: {{query}} Context: {{context}} Rate relevance from 0 to 1.',
-            examples: ['Model: gpt-4o-mini', '{{query}}', '{{context}}'],
-            lastUpdated: '18/01/2026, 13:32:35' // Assuming same for demo
-        }
-    ];
-
-    // State for Real Logs
+    // State for DB data
+    const [activeEvaluators, setActiveEvaluators] = useState<Evaluator[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
     const [evalLogs, setEvalLogs] = useState<EvaluationLog[]>([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
+
+    // Fetch data based on tab
+    useEffect(() => {
+        if (activeTab === 'evaluators') {
+            apiClient.getEvaluators().then(setActiveEvaluators).catch(console.error);
+        } else if (activeTab === 'templates') {
+            apiClient.getTemplates().then(setTemplates).catch(console.error);
+        } else if (activeTab === 'logs') {
+            const fetchLogs = async () => {
+                setLoadingLogs(true);
+                try {
+                    const data = await apiClient.getEvaluationLogs();
+                    setEvalLogs(data);
+                } catch (err) {
+                    console.error("Failed to fetch evaluation logs", err);
+                } finally {
+                    setLoadingLogs(false);
+                }
+            };
+            fetchLogs();
+        }
+    }, [activeTab]);
 
     // Fetch Logs on Tab Change
     useEffect(() => {
@@ -135,24 +113,44 @@ const Evaluators = () => {
                                         <tr key={ev.id} className="hover:bg-[#1C2028] transition-colors group">
                                             <td className="px-6 py-4 font-medium text-slate-100">{ev.name}</td>
                                             <td className="px-6 py-4">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
-                                                    {ev.status}
-                                                </span>
+                                                <button
+                                                    onClick={() => {
+                                                        const newStatus = ev.status === 'Active' ? 'Inactive' : 'Active';
+                                                        setActiveEvaluators(prev => prev.map(e => e.id === ev.id ? { ...e, status: newStatus } : e));
+                                                        apiClient.updateEvaluatorStatus(ev.id, newStatus).catch(err => {
+                                                            console.error("Failed to update status", err);
+                                                            setActiveEvaluators(prev => prev.map(e => e.id === ev.id ? { ...e, status: ev.status } : e));
+                                                        });
+                                                    }}
+                                                    className={clsx(
+                                                        "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                                        ev.status === 'Active' ? 'bg-emerald-500' : 'bg-slate-600'
+                                                    )}
+                                                    title={`Toggle status to ${ev.status === 'Active' ? 'Inactive' : 'Active'}`}
+                                                >
+                                                    <span className="sr-only">Toggle Status</span>
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className={clsx(
+                                                            "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                                            ev.status === 'Active' ? 'translate-x-4' : 'translate-x-0'
+                                                        )}
+                                                    />
+                                                </button>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className="px-2 py-1 bg-slate-800 rounded text-slate-300 text-xs font-mono">
-                                                    {ev.template}
+                                                    {ev.template_id}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 font-mono text-slate-400 text-xs">{ev.scoreName}</td>
+                                            <td className="px-6 py-4 font-mono text-slate-400 text-xs">{ev.score_name}</td>
                                             <td className="px-6 py-4">
                                                 <span className="px-2 py-1 border border-slate-700 rounded text-slate-400 text-[10px] font-bold uppercase tracking-wide">
                                                     {ev.target}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-slate-300">{ev.sampling}</td>
-                                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">{ev.created}</td>
+                                            <td className="px-6 py-4 text-slate-300">{ev.execution?.sampling_rate ? (ev.execution.sampling_rate * 100) + '%' : '100%'}</td>
+                                            <td className="px-6 py-4 text-slate-500 font-mono text-xs">Today</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -189,13 +187,13 @@ const Evaluators = () => {
                                     </div>
 
                                     <div className="flex flex-wrap gap-2 mb-4">
-                                        {tmpl.examples.map((ex, i) => (
+                                        {tmpl.inputs && tmpl.inputs.map((ex: string, i: number) => (
                                             <span key={i} className="px-2.5 py-1 bg-slate-800 text-slate-400 text-xs rounded-full border border-slate-700 font-mono">
-                                                {ex}
+                                                {`{{${ex}}}`}
                                             </span>
                                         ))}
                                     </div>
-                                    <p className="text-xs text-slate-600">Last updated: {tmpl.lastUpdated}</p>
+                                    <p className="text-xs text-slate-600">Model: {tmpl.model}</p>
                                 </div>
                             ))}
                         </div>

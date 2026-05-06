@@ -57,6 +57,27 @@ export interface EvaluationLog {
     status: string;
 }
 
+export interface Template {
+    id: string;
+    name: string;
+    version: string;
+    description: string;
+    model: string;
+    inputs: string[];
+    template: string;
+}
+
+export interface Evaluator {
+    id: string;
+    name: string;
+    score_name: string;
+    template_id: string;
+    target: string;
+    status: string;
+    variable_mapping: Record<string, string>;
+    execution: any;
+}
+
 // Live Dashboard Types (from JSONL metrics)
 export interface DailyActiveUsers {
     date: string;
@@ -140,6 +161,30 @@ export const apiClient = {
     async getEvaluationLogs(limit: number = 50): Promise<EvaluationLog[]> {
         const response = await fetch(`${API_BASE_URL.replace('/analytics', '/evaluations')}/logs?limit=${limit}`);
         if (!response.ok) throw new Error('Failed to fetch evaluation logs');
+        return response.json();
+    },
+
+    async getEvaluators(): Promise<Evaluator[]> {
+        const response = await fetch(`${API_BASE_URL.replace('/analytics', '/evaluators')}/`);
+        if (!response.ok) throw new Error('Failed to fetch evaluators');
+        return response.json();
+    },
+
+    async updateEvaluatorStatus(id: string, status: string): Promise<any> {
+        const response = await fetch(`${API_BASE_URL.replace('/analytics', '/evaluators')}/${id}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status })
+        });
+        if (!response.ok) throw new Error('Failed to update evaluator status');
+        return response.json();
+    },
+
+    async getTemplates(): Promise<Template[]> {
+        const response = await fetch(`${API_BASE_URL.replace('/analytics', '/templates')}/`);
+        if (!response.ok) throw new Error('Failed to fetch templates');
         return response.json();
     },
 

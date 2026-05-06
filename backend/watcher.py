@@ -61,9 +61,16 @@ def main():
     print(f"Executing:            {execute_script}\n")
 
     event_handler = LogFileHandler(target_file, execute_script, debounce_seconds=1.0)
+    
+    # NEW handler for evaluations
+    eval_target = "standard_trace_logs.jsonl"
+    eval_script = "services/evaluator_runner.py"
+    eval_handler = LogFileHandler(eval_target, eval_script, debounce_seconds=2.0)
+
     observer = Observer()
     # Schedule the observer to watch the backend directory recursively (or non-recursively)
     observer.schedule(event_handler, str(backend_dir), recursive=False)
+    observer.schedule(eval_handler, str(backend_dir), recursive=False)
     observer.start()
 
     try:

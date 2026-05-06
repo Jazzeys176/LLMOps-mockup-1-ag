@@ -34,27 +34,23 @@ async def get_evaluation_logs(
     """
     query = """
     SELECT 
-        timestamp,
-        evaluator_name,
-        trace_id,
-        score_value,
-        duration_ms,
-        status
-    FROM evaluations
-    ORDER BY timestamp DESC
+        e.created_at,
+        ev.name as evaluator_name,
+        e.trace_id,
+        e.score,
+        e.duration_ms,
+        e.status
+    FROM evaluations e
+    LEFT JOIN evaluators ev ON e.evaluator_id = ev.id
+    ORDER BY e.created_at DESC
     LIMIT ?
     """
     
     logs = query_db_dict(query, (limit,))
     
-    # Format timestamp if needed, though Pydantic might handle datetime objects if we configured it.
-    # The current client.py query_db_dict returns native python types, so timestamp is likely a datetime object.
-    # We'll explicitly convert to ISO string to match the response model which expects string (or rely on pydantic automatic conversion if we used datetime type).
-    # Since I defined timestamp as Optional[str], I will handle string conversion.
-    
     results = []
     for log in logs:
-        ts = log["timestamp"]
+        ts = log["created_at"]
         if hasattr(ts, "isoformat"):
             ts = ts.isoformat()
         else:
@@ -62,11 +58,11 @@ async def get_evaluation_logs(
             
         results.append({
             "timestamp": ts,
-            "evaluator_name": log["evaluator_name"],
-            "trace_id": log["trace_id"],
-            "score_value": log["score_value"],
-            "duration_ms": log["duration_ms"],
-            "status": log["status"]
+            "evaluator_name": log.get("evaluator_name") or "Unknown",
+            "trace_id": log.get("trace_id") or "",
+            "score_value": log.get("score") or 0.0,
+            "duration_ms": log.get("duration_ms") or 0.0,
+            "status": log.get("status") or "Unknown"
         })
         
     return results
